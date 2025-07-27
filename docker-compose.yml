@@ -1,5 +1,3 @@
-version: '3.12'
-
 services:
   # 主應用程式
   app:
@@ -92,15 +90,17 @@ services:
     networks:
       - rag-network
     restart: unless-stopped
-    profiles:
-      - ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # 移除 ollama 服務的 profiles 設定，讓它預設啟動
+    # profiles:
+    #  - ollama
+    # 暫時移除 GPU 限制 (等 HW 有支援再打開)
+    # deploy:
+    #  resources:
+    #    reservations:
+    #      devices:
+    #        - driver: nvidia
+    #          count: all
+    #          capabilities: [gpu]
 
 networks:
   rag-network:

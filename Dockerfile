@@ -1,5 +1,5 @@
 # 使用多階段構建優化映像大小
-FROM python:3.12-slim as builder
+FROM python:3.12 AS builder
 
 # 安裝構建依賴
 RUN apt-get update && apt-get install -y \
@@ -17,7 +17,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --target=/app/deps -r requirements.txt
 
 # 最終階段
-FROM python:3.12-slim
+FROM python:3.12
 
 # 安裝運行時依賴
 RUN apt-get update && apt-get install -y \
