@@ -3,12 +3,26 @@ from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_community.llms import Ollama
 
+# 嘗試使用 config 模組，如果失敗則使用環境變數
+try:
+    from config import get_config
+    USE_CONFIG = True
+except ImportError:
+    USE_CONFIG = False
+
 def get_llm(provider=None):
-    # 使用環境變數或參數
-    provider = provider or os.getenv("LLM_PROVIDER", "openai")
+    # 使用配置系統或環境變數
+    if USE_CONFIG:
+        provider = provider or get_config("LLM_PROVIDER", "openai")
+    else:
+        provider = provider or os.getenv("LLM_PROVIDER", "openai")
     
     if provider in ["claude", "anthropic"]:
-        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if USE_CONFIG:
+            api_key = get_config("ANTHROPIC_API_KEY")
+        else:
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
         
@@ -19,7 +33,11 @@ def get_llm(provider=None):
         )
     
     elif provider == "openai":
-        api_key = os.getenv("OPENAI_API_KEY")
+        if USE_CONFIG:
+            api_key = get_config("OPENAI_API_KEY")
+        else:
+            api_key = os.getenv("OPENAI_API_KEY")
+            
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         

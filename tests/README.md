@@ -43,7 +43,7 @@ pytest --cov=. --cov-report=html
 pytest -vv
 
 # 使用測試執行腳本
-python run_tests.py --coverage
+python3.12 run_tests.py --coverage
 ```
 
 ## 測試類別
