@@ -1,0 +1,61 @@
+# pytest 配置檔案
+
+[tool:pytest]
+# 測試檔案模式
+python_files = test_*.py *_test.py
+python_classes = Test*
+python_functions = test_*
+
+# 測試目錄
+testpaths = tests
+
+# 輸出選項
+addopts = 
+    -v                          # 詳細輸出
+    --strict-markers            # 嚴格標記模式
+    --tb=short                  # 簡短的錯誤追蹤
+    --cov=.                     # 測試覆蓋率
+    --cov-report=html           # HTML 覆蓋率報告
+    --cov-report=term-missing   # 終端覆蓋率報告
+    --cov-fail-under=70         # 最低覆蓋率要求 70%
+
+# 標記定義
+markers =
+    unit: 單元測試
+    integration: 整合測試
+    slow: 緩慢的測試
+    skip_ci: 在 CI 環境中跳過
+
+# 測試超時（秒）
+timeout = 300
+
+# 忽略的警告
+filterwarnings =
+    ignore::DeprecationWarning
+    ignore::PendingDeprecationWarning
+
+# 日誌設定
+log_cli = true
+log_cli_level = INFO
+log_cli_format = %(asctime)s [%(levelname)s] %(message)s
+log_cli_date_format = %Y-%m-%d %H:%M:%S
+
+# 覆蓋率設定
+[coverage:run]
+source = .
+omit = 
+    */tests/*
+    */venv/*
+    */__pycache__/*
+    */site-packages/*
+    setup.py
+
+[coverage:report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstract

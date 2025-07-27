@@ -1,0 +1,374 @@
+"""
+SQL 資料庫測試
+
+測試資料庫相關功能：
+- 自然語言轉 SQL
+- SQL 執行
+- 資料庫連接
+"""
+
+import pytest
+import os
+from unittest.mock import Mock, patch, MagicMock, call
+import sqlalchemy
+from sqlalchemy.exc import SQLAlchemyError
+from db.sql_executor import (
+    query_database,
+    nl_to_sql,
+    execute_sql,
+    get_db_config,
+    create_engine,
+    get_database_schema,
+    test_connection
+)
+
+
+class TestDatabaseConfig:
+    """資料庫配置測試"""
+    
+    def setup_method(self):
+        """設置測試環境"""
+        self.original_env = os.environ.copy()
+    
+    def teardown_method(self):
+        """清理測試環境"""
+        os.environ.clear()
+        os.environ.update(self.original_env)
+    
+    def test_postgresql_config(self):
+        """測試 PostgreSQL 配置"""
+        os.environ.update({
+            "DB_TYPE": "postgresql",
+            "DB_USER": "testuser",
+            "DB_PASSWORD": "testpass",
+            "DB_HOST": "testhost",
+            "DB_PORT": "5432",
+            "DB_NAME": "testdb"
+        })
+        
+        config = get_db_config()
+        expected = "postgresql+psycopg2://testuser:testpass@testhost:5432/testdb"
+        assert config == expected
+    
+    def test_mysql_config(self):
+        """測試 MySQL 配置"""
+        os.environ.update({
+            "DB_TYPE": "mysql",
+            "DB_USER": "testuser",
+            "DB_PASSWORD": "testpass",
+            "DB_HOST": "testhost",
+            "DB_PORT": "3306",
+            "DB_NAME": "testdb"
+        })
+        
+        config = get_db_config()
+        expected = "mysql+pymysql://testuser:testpass@testhost:3306/testdb"
+        assert config == expected
+    
+    def test_default_config(self):
+        """測試預設配置"""
+        # 清除所有資料庫相關環境變數
+        for key in list(os.environ.keys()):
+            if key.startswith("DB_"):
+                del os.environ[key]
+        
+        config = get_db_config()
+        expected = "postgresql+psycopg2://raguser:ragpass@localhost:5432/ragdb"
+        assert config == expected
+    
+    def test_unsupported_db_type(self):
+        """測試不支援的資料庫類型"""
+        os.environ["DB_TYPE"] = "unsupported"
+        
+        with pytest.raises(ValueError, match="Unsupported database type"):
+            get_db_config()
+
+
+class TestNLToSQL:
+    """自然語言轉 SQL 測試"""
+    
+    @patch('db.sql_executor.get_llm')
+    def test_nl_to_sql_basic(self, mock_get_llm):
+        """測試基本的自然語言轉 SQL"""
+        # 設置 mock
+        mock_llm = Mock()
+        mock_llm.predict.return_value = "SELECT * FROM products WHERE category = 'electronics'"
+        mock_get_llm.return_value = mock_llm
+        
+        # 執行轉換
+        sql = nl_to_sql("查詢所有電子產品")
+        
+        # 驗證
+        assert sql == "SELECT * FROM products WHERE category = 'electronics'"
+        assert mock_llm.predict.called
+        
+        # 檢查提示詞是否包含資料庫結構
+        call_args = mock_llm.predict.call_args[0][0]
+        assert "資料庫結構" in call_args
+        assert "products" in call_args
+    
+    @patch('db.sql_executor.get_llm')
+    def test_nl_to_sql_with_markdown(self, mock_get_llm):
+        """測試處理包含 Markdown 的 SQL"""
+        # 設置 mock 返回包含 markdown 的 SQL
+        mock_llm = Mock()
+        mock_llm.predict.return_value = """```sql
+SELECT COUNT(*) FROM orders WHERE status = 'completed'
+```"""
+        mock_get_llm.return_value = mock_llm
+        
+        # 執行轉換
+        sql = nl_to_sql("計算已完成的訂單數量")
+        
+        # 驗證 markdown 被移除
+        assert sql == "SELECT COUNT(*) FROM orders WHERE status = 'completed'"
+    
+    @patch('db.sql_executor.get_llm')
+    def test_nl_to_sql_injection_protection(self, mock_get_llm):
+        """測試 SQL 注入防護"""
+        # 設置 mock 返回危險的 SQL
+        mock_llm = Mock()
+        mock_llm.predict.return_value = "DROP TABLE users; SELECT * FROM products"
+        mock_get_llm.return_value = mock_llm
+        
+        # 應該拋出錯誤
+        with pytest.raises(ValueError, match="不允許執行危險的 SQL 操作"):
+            nl_to_sql("刪除用戶表")
+    
+    @patch('db.sql_executor.get_llm')
+    def test_nl_to_sql_various_dangerous_operations(self, mock_get_llm):
+        """測試各種危險操作的防護"""
+        dangerous_sqls = [
+            "DELETE FROM products WHERE 1=1",
+            "TRUNCATE TABLE orders",
+            "ALTER TABLE users ADD COLUMN password VARCHAR(255)",
+            "drop table products"  # 測試大小寫
+        ]
+        
+        mock_llm = Mock()
+        mock_get_llm.return_value = mock_llm
+        
+        for dangerous_sql in dangerous_sqls:
+            mock_llm.predict.return_value = dangerous_sql
+            with pytest.raises(ValueError, match="不允許執行危險的 SQL 操作"):
+                nl_to_sql("執行危險操作")
+
+
+class TestSQLExecution:
+    """SQL 執行測試"""
+    
+    @patch('db.sql_executor.create_engine')
+    def test_execute_sql_success(self, mock_create_engine):
+        """測試成功執行 SQL"""
+        # 設置 mock
+        mock_engine = Mock()
+        mock_connection = Mock()
+        mock_result = Mock()
+        
+        # 模擬查詢結果
+        mock_result.fetchall.return_value = [
+            (1, "產品A", 100.0),
+            (2, "產品B", 200.0)
+        ]
+        mock_result.keys.return_value = ["id", "name", "price"]
+        
+        mock_connection.execute.return_value = mock_result
+        mock_engine.connect.return_value.__enter__.return_value = mock_connection
+        mock_engine.connect.return_value.__exit__.return_value = None
+        
+        mock_create_engine.return_value = mock_engine
+        
+        # 執行 SQL
+        results = execute_sql("SELECT id, name, price FROM products")
+        
+        # 驗證結果
+        assert len(results) == 2
+        assert results[0] == {"id": 1, "name": "產品A", "price": 100.0}
+        assert results[1] == {"id": 2, "name": "產品B", "price": 200.0}
+        
+        # 驗證連接被正確關閉
+        mock_engine.dispose.assert_called_once()
+    
+    @patch('db.sql_executor.create_engine')
+    def test_execute_sql_with_params(self, mock_create_engine):
+        """測試帶參數的 SQL 執行"""
+        # 設置 mock
+        mock_engine = Mock()
+        mock_connection = Mock()
+        mock_result = Mock()
+        
+        mock_result.fetchall.return_value = [(1, "產品A")]
+        mock_result.keys.return_value = ["id", "name"]
+        
+        mock_connection.execute.return_value = mock_result
+        mock_engine.connect.return_value.__enter__.return_value = mock_connection
+        mock_engine.connect.return_value.__exit__.return_value = None
+        
+        mock_create_engine.return_value = mock_engine
+        
+        # 執行帶參數的 SQL
+        sql = "SELECT id, name FROM products WHERE category = :category"
+        params = {"category": "electronics"}
+        results = execute_sql(sql, params)
+        
+        # 驗證參數被正確傳遞
+        mock_connection.execute.assert_called_once()
+        call_args = mock_connection.execute.call_args
+        assert params in call_args[0] or params == call_args[1]
+    
+    @patch('db.sql_executor.create_engine')
+    def test_execute_sql_error(self, mock_create_engine):
+        """測試 SQL 執行錯誤"""
+        # 設置 mock 拋出錯誤
+        mock_engine = Mock()
+        mock_connection = Mock()
+        mock_connection.execute.side_effect = SQLAlchemyError("Database error")
+        
+        mock_engine.connect.return_value.__enter__.return_value = mock_connection
+        mock_engine.connect.return_value.__exit__.return_value = None
+        
+        mock_create_engine.return_value = mock_engine
+        
+        # 應該拋出錯誤
+        with pytest.raises(SQLAlchemyError):
+            execute_sql("INVALID SQL")
+        
+        # 確保引擎被清理
+        mock_engine.dispose.assert_called_once()
+
+
+class TestQueryDatabase:
+    """完整查詢資料庫測試"""
+    
+    @patch('db.sql_executor.execute_sql')
+    @patch('db.sql_executor.nl_to_sql')
+    def test_query_database_success(self, mock_nl_to_sql, mock_execute_sql):
+        """測試成功查詢資料庫"""
+        # 設置 mocks
+        mock_nl_to_sql.return_value = "SELECT * FROM products"
+        mock_execute_sql.return_value = [
+            {"id": 1, "name": "產品A"},
+            {"id": 2, "name": "產品B"}
+        ]
+        
+        # 執行查詢
+        results = query_database("顯示所有產品")
+        
+        # 驗證
+        assert len(results) == 2
+        assert results[0]["name"] == "產品A"
+        mock_nl_to_sql.assert_called_once_with("顯示所有產品")
+        mock_execute_sql.assert_called_once_with("SELECT * FROM products")
+    
+    @patch('db.sql_executor.execute_sql')
+    @patch('db.sql_executor.nl_to_sql')
+    def test_query_database_error(self, mock_nl_to_sql, mock_execute_sql):
+        """測試查詢資料庫錯誤處理"""
+        # 設置 mock 拋出錯誤
+        mock_nl_to_sql.side_effect = Exception("轉換失敗")
+        
+        # 執行查詢
+        results = query_database("無效查詢")
+        
+        # 應該返回錯誤資訊
+        assert len(results) == 1
+        assert "error" in results[0]
+        assert "查詢失敗" in results[0]["error"]
+
+
+class TestDatabaseConnection:
+    """資料庫連接測試"""
+    
+    @patch('db.sql_executor.create_engine')
+    def test_connection_success(self, mock_create_engine):
+        """測試成功連接資料庫"""
+        # 設置 mock
+        mock_engine = Mock()
+        mock_connection = Mock()
+        mock_connection.execute.return_value = Mock()
+        
+        mock_engine.connect.return_value.__enter__.return_value = mock_connection
+        mock_engine.connect.return_value.__exit__.return_value = None
+        
+        mock_create_engine.return_value = mock_engine
+        
+        # 測試連接
+        result = test_connection()
+        
+        # 驗證
+        assert result is True
+        mock_connection.execute.assert_called_once()
+    
+    @patch('db.sql_executor.create_engine')
+    def test_connection_failure(self, mock_create_engine):
+        """測試連接資料庫失敗"""
+        # 設置 mock 拋出錯誤
+        mock_create_engine.side_effect = Exception("Connection failed")
+        
+        # 測試連接
+        result = test_connection()
+        
+        # 驗證
+        assert result is False
+
+
+class TestDatabaseSchema:
+    """資料庫結構測試"""
+    
+    def test_get_database_schema(self):
+        """測試獲取資料庫結構"""
+        schema = get_database_schema()
+        
+        # 驗證結構包含必要的資訊
+        assert "products" in schema
+        assert "orders" in schema
+        assert "order_items" in schema
+        assert "id" in schema
+        assert "INTEGER" in schema
+        assert "VARCHAR" in schema
+
+
+# 測試 fixtures
+@pytest.fixture
+def mock_db_connection():
+    """模擬資料庫連接"""
+    mock_conn = Mock()
+    mock_result = Mock()
+    mock_result.fetchall.return_value = [
+        {"id": 1, "name": "Test Product", "price": 99.99}
+    ]
+    mock_conn.execute.return_value = mock_result
+    return mock_conn
+
+
+@pytest.fixture
+def sample_sql_results():
+    """提供測試用的 SQL 查詢結果"""
+    return [
+        {
+            "id": 1,
+            "customer_name": "張三",
+            "order_date": "2024-01-01",
+            "total_amount": 1500.00,
+            "status": "completed"
+        },
+        {
+            "id": 2,
+            "customer_name": "李四",
+            "order_date": "2024-01-02",
+            "total_amount": 2500.00,
+            "status": "processing"
+        }
+    ]
+
+
+@pytest.fixture
+def dangerous_sql_queries():
+    """提供危險的 SQL 查詢用於測試"""
+    return [
+        "DROP TABLE users",
+        "DELETE FROM products",
+        "TRUNCATE orders",
+        "ALTER TABLE customers DROP COLUMN email",
+        "UPDATE users SET password = '123456'",
+    ]

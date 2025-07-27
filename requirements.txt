@@ -1,11 +1,52 @@
-langchain
-openai
-streamlit
-chromadb
-python-docx
-pymysql
-psycopg2
-redis
-qdrant-client
-anthropic
-sentence-transformers
+# Core LangChain
+langchain==0.1.0
+langchain-community==0.1.0
+langchain-openai==0.0.5
+langchain-anthropic==0.0.1
+langchain-huggingface==0.0.1
+
+# LLM Providers
+openai==1.12.0
+anthropic==0.18.1
+
+# Vector Stores
+chromadb==0.4.22
+redis==5.0.1
+qdrant-client==1.7.1
+
+# Embeddings
+sentence-transformers==2.3.1
+tiktoken==0.5.2
+
+# Document Processing
+pypdf==3.17.4
+python-docx==1.1.0
+openpyxl==3.1.2
+unstructured==0.11.8
+python-magic==0.4.27
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+pymysql==1.1.0
+
+# Web Framework
+streamlit==1.31.0
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.3
+numpy==1.26.3
+pandas==2.1.4
+
+# Async Support
+aiohttp==3.9.1
+asyncio==3.4.3
+
+# Logging and Monitoring
+loguru==0.7.2
+
+# Testing (optional)
+pytest==7.4.4
+pytest-asyncio==0.23.3
