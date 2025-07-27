@@ -26,52 +26,84 @@
 
 ## Docker 安裝方式（推薦）
 
-### 1. 準備環境變數檔案
+### 1. 環境需求
+- Docker 20.10+ 和 Docker Compose 2.0+
+- 至少 8GB RAM（Ollama 需要較多記憶體）
+- 15GB 可用硬碟空間（包含模型）
 
-創建 `.env` 檔案：
-
-```bash
-# LLM 設定（選擇其一）
-LLM_PROVIDER=claude  # 可選：openai, claude, ollama
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-# OPENAI_API_KEY=your_openai_api_key_here
-
-# 向量資料庫設定
-VECTOR_DB=chroma  # 可選：chroma, redis, qdrant
-EMBED_PROVIDER=openai  # 可選：openai, huggingface
-
-# 資料庫設定（可選）
-DB_TYPE=postgresql
-DB_HOST=postgres
-DB_PORT=5432
-DB_USER=raguser
-DB_PASSWORD=ragpass
-DB_NAME=ragdb
-```
-
-### 2. 使用 Docker Compose 啟動
+### 2. 快速啟動
 
 ```bash
 # 克隆專案
 git clone <your-repo-url>
 cd rag-system
 
-# 啟動所有服務
+# 設定環境變數
+cp .env.example .env
+
+# 一鍵啟動所有服務（包含 Ollama）
 docker-compose up -d
+
+# 首次需要下載 Ollama 模型（約 5GB）
+docker-compose exec ollama ollama pull llama3
 
 # 檢查服務狀態
 docker-compose ps
 
-# 查看日誌
+# 查看啟動日誌
 docker-compose logs -f app
-
-# 停止服務
-docker-compose down
 ```
 
-### 3. 訪問系統
+### 3. 服務說明
 
-打開瀏覽器訪問：http://localhost:8501
+啟動後會運行以下服務：
+
+| 服務 | 容器名稱 | 端口 | 說明 |
+|------|----------|------|------|
+| RAG 應用 | rag-app | 8501 | Streamlit Web UI |
+| Ollama | rag-ollama | 11434 | LLM 服務 |
+| PostgreSQL | rag-postgres | 5432 | 關聯式資料庫 |
+| Redis | rag-redis | 6379 | 向量資料庫快取 |
+
+### 4. 訪問系統
+
+- **Web UI**: http://localhost:8501
+- **Ollama API**: http://localhost:11434
+- **健康檢查**: http://localhost:8501/_stcore/health
+
+### 5. 基本操作
+
+```bash
+# 停止服務
+docker-compose stop
+
+# 重啟服務
+docker-compose restart
+
+# 查看日誌
+docker-compose logs -f [service_name]
+
+# 完全移除（保留資料）
+docker-compose down
+
+# 完全移除（包含資料）⚠️ 警告
+docker-compose down -v
+```
+
+### 6. 更換 Ollama 模型
+
+```bash
+# 列出可用模型
+docker-compose exec ollama ollama list
+
+# 下載其他模型
+docker-compose exec ollama ollama pull mistral    # 7B 參數
+docker-compose exec ollama ollama pull gemma:2b   # 2B 參數（較小）
+docker-compose exec ollama ollama pull llama2:13b # 13B 參數（較大）
+
+# 在 .env 中更換模型
+OLLAMA_MODEL=mistral
+```
 
 ## 本地安裝方式
 

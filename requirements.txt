@@ -1,13 +1,13 @@
-# Core LangChain
-langchain==0.1.0
-langchain-community==0.1.0
-langchain-openai==0.0.5
-langchain-anthropic==0.0.1
-langchain-huggingface==0.0.1
+# Core LangChain - 使用最新兼容版本
+langchain
+langchain-community
+langchain-openai
+langchain-anthropic
+langchain-huggingface
 
 # LLM Providers
 openai==1.12.0
-anthropic==0.18.1
+anthropic
 
 # Vector Stores
 chromadb==0.4.22
@@ -15,7 +15,7 @@ redis==5.0.1
 qdrant-client==1.7.1
 
 # Embeddings
-sentence-transformers==2.3.1
+sentence-transformers
 tiktoken==0.5.2
 
 # Document Processing
@@ -31,23 +31,22 @@ sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 pymysql==1.1.0
 
-# Web Framework
+# Web UI
 streamlit==1.31.0
 
-# Utilities
+# Utils
 python-dotenv==1.0.0
 pydantic==2.5.3
 pydantic-settings==2.1.0
 numpy==1.26.3
 pandas==2.1.4
 
-# Async Support
+# Async
 aiohttp==3.9.1
-asyncio==3.4.3
 
-# Logging and Monitoring
+# Logging
 loguru==0.7.2
 
-# Testing (optional)
+# Testing
 pytest==7.4.4
 pytest-asyncio==0.23.3

@@ -1,29 +1,64 @@
 services:
   # 主應用程式
   app:
-    build: .
+    command: ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: rag-app:latest
     container_name: rag-app
     ports:
       - "8501:8501"
     environment:
       - PYTHONUNBUFFERED=1
+      # Ollama 在 Docker 內部的連接
+      - OLLAMA_BASE_URL=http://ollama:11434
     env_file:
       - .env
     volumes:
       - ./docs:/app/docs
       - ./vector_db:/app/vector_db
       - ./uploads:/app/uploads
+      - ./logs:/app/logs
     depends_on:
       - postgres
       - redis
+      - ollama
     networks:
       - rag-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501"]
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # Ollama LLM 服務（預設啟動）
+  ollama:
+    image: ollama/ollama:latest
+    container_name: rag-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    # 如果有 GPU，取消下面的註解
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
 
   # PostgreSQL 資料庫
   postgres:
@@ -35,7 +70,7 @@ services:
       POSTGRES_DB: ${DB_NAME:-ragdb}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5432:5432"
     networks:
@@ -47,7 +82,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis (用於向量資料庫)
+  # Redis (用於向量資料庫快取)
   redis:
     image: redis:7-alpine
     container_name: rag-redis
@@ -76,31 +111,9 @@ services:
     networks:
       - rag-network
     restart: unless-stopped
+    # 有以下 2 行開機就不會自動運行 (要自動運行要把這2行 mark 掉)
     profiles:
       - qdrant
-
-  # Ollama (可選的本地 LLM)
-  ollama:
-    image: ollama/ollama:latest
-    container_name: rag-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - rag-network
-    restart: unless-stopped
-    # 移除 ollama 服務的 profiles 設定，讓它預設啟動
-    # profiles:
-    #  - ollama
-    # 暫時移除 GPU 限制 (等 HW 有支援再打開)
-    # deploy:
-    #  resources:
-    #    reservations:
-    #      devices:
-    #        - driver: nvidia
-    #          count: all
-    #          capabilities: [gpu]
 
 networks:
   rag-network:

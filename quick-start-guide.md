@@ -101,19 +101,98 @@ HUGGINGFACE_MODEL=shibing624/text2vec-base-chinese
    OLLAMA_MODEL=orca-mini  # 輕量級模型
    ```
 
-## 🐳 使用 Docker（可選）
+## 🐳 使用 Docker（最簡單）
 
-如果偏好使用 Docker：
+如果你偏好使用 Docker，所有服務（包括 Ollama）會自動配置：
+
+### Docker 快速啟動
 
 ```bash
-# 修改 docker-compose.yml，確保 ollama 服務已啟動
-docker-compose --profile ollama up -d
+# 1. 克隆專案
+git clone <your-repo-url>
+cd rag-system
 
-# 進入容器下載模型
+# 2. 複製環境變數
+cp .env.example .env
+
+# 3. 啟動所有服務
+docker-compose up -d
+
+# 4. 等待服務啟動（約 30 秒）
+sleep 30
+
+# 5. 下載 Ollama 模型（首次約需 5 分鐘）
 docker-compose exec ollama ollama pull llama3
 
-# 啟動主應用
-docker-compose up -d app
+# 6. 訪問系統
+open http://localhost:8501  # macOS
+# 或
+xdg-open http://localhost:8501  # Linux
+```
+
+### Docker 環境變數調整
+
+在 `.env` 檔案中，使用 Docker 內部網路名稱：
+
+```bash
+# Docker 內部連接設定
+OLLAMA_BASE_URL=http://ollama:11434
+DB_HOST=postgres
+REDIS_URL=redis://redis:6379
+```
+
+### 驗證 Docker 服務
+
+```bash
+# 檢查所有服務狀態
+docker-compose ps
+
+# 應該看到以下服務都是 "Up" 狀態：
+# - rag-app (8501)
+# - rag-ollama (11434)
+# - rag-postgres (5432)
+# - rag-redis (6379)
+
+# 測試 Ollama
+docker-compose exec ollama ollama list
+
+# 測試應用連接
+docker-compose exec app curl http://ollama:11434/api/tags
+```
+
+### Docker 常用操作
+
+```bash
+# 查看日誌
+docker-compose logs -f app
+
+# 重啟服務
+docker-compose restart
+
+# 停止服務
+docker-compose stop
+
+# 進入容器除錯
+docker-compose exec app bash
+```
+
+### Docker 資源需求
+
+- **最小配置**：4GB RAM, 10GB 硬碟
+- **建議配置**：8GB RAM, 20GB 硬碟
+- **GPU 支援**：如有 NVIDIA GPU，可在 docker-compose.yml 中啟用
+
+### 切換到更小的模型（如果記憶體不足）
+
+```bash
+# 使用較小的模型
+docker-compose exec ollama ollama pull gemma:2b
+
+# 更新 .env
+OLLAMA_MODEL=gemma:2b
+
+# 重啟應用
+docker-compose restart app
 ```
 
 ## ❓ 常見問題
