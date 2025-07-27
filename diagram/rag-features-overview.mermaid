@@ -1,0 +1,104 @@
+graph TB
+    subgraph "🧠 RAG 全功能系統"
+        subgraph "📥 輸入支援"
+            INPUT[多格式文件輸入]
+            INPUT --> PDF[PDF 文件]
+            INPUT --> OFFICE[Office 文件<br/>Word/Excel]
+            INPUT --> WEB[網頁格式<br/>HTML/Markdown]
+            INPUT --> DATA[資料格式<br/>JSON/TXT]
+            
+            QUERY[查詢方式]
+            QUERY --> NL[自然語言查詢]
+            QUERY --> MULTI[多資料源查詢]
+            QUERY --> BATCH[批次處理]
+        end
+        
+        subgraph "🤖 AI 模型支援"
+            LLM_SUPPORT[語言模型]
+            LLM_SUPPORT --> PAID[付費模型]
+            PAID --> GPT[OpenAI GPT]
+            PAID --> CLAUDE_AI[Anthropic Claude]
+            
+            LLM_SUPPORT --> FREE[免費模型]
+            FREE --> OLLAMA_MODELS[Ollama 本地模型<br/>Llama3/Mistral/Gemma]
+            
+            EMBED_SUPPORT[嵌入模型]
+            EMBED_SUPPORT --> OPENAI_EMB[OpenAI Embeddings]
+            EMBED_SUPPORT --> HF_EMB[HuggingFace<br/>免費嵌入]
+        end
+        
+        subgraph "💾 資料儲存"
+            STORAGE[儲存方案]
+            STORAGE --> VECTOR_DBS[向量資料庫]
+            VECTOR_DBS --> CHROMA_DB[Chroma<br/>本地持久化]
+            VECTOR_DBS --> REDIS_DB[Redis<br/>分散式快取]
+            VECTOR_DBS --> QDRANT_DB[Qdrant<br/>雲端擴展]
+            
+            STORAGE --> SQL_DBS[關聯式資料庫]
+            SQL_DBS --> POSTGRES[PostgreSQL]
+            SQL_DBS --> MYSQL_DB[MySQL]
+        end
+        
+        subgraph "🔧 核心功能"
+            FEATURES[系統功能]
+            FEATURES --> RAG_FUNC[RAG 問答]
+            RAG_FUNC --> SEMANTIC[語意搜尋]
+            RAG_FUNC --> CONTEXT[上下文理解]
+            
+            FEATURES --> SQL_FUNC[資料庫查詢]
+            SQL_FUNC --> NL2SQL[自然語言轉SQL]
+            SQL_FUNC --> SAFE_EXEC[安全執行]
+            
+            FEATURES --> HYBRID[混合查詢]
+            HYBRID --> DOC_DB[文件+資料庫]
+        end
+        
+        subgraph "🖥️ 使用介面"
+            UI[介面選項]
+            UI --> WEB_UI[網頁介面]
+            WEB_UI --> STREAMLIT_UI[Streamlit<br/>視覺化互動]
+            WEB_UI --> FILE_UPLOAD[檔案上傳]
+            WEB_UI --> REALTIME[即時回應]
+            
+            UI --> CLI_UI[命令列]
+            CLI_UI --> SCRIPT[腳本自動化]
+            CLI_UI --> TEST[快速測試]
+        end
+        
+        subgraph "🚀 部署選項"
+            DEPLOY[部署方式]
+            DEPLOY --> DOCKER[容器化部署]
+            DOCKER --> COMPOSE[Docker Compose<br/>一鍵啟動]
+            
+            DEPLOY --> LOCAL[本地部署]
+            LOCAL --> VENV[Python 虛擬環境]
+            
+            DEPLOY --> CLOUD[雲端部署]
+            CLOUD --> SCALABLE[可擴展架構]
+        end
+        
+        subgraph "🛡️ 系統特性"
+            FEATURES_SYS[系統優勢]
+            FEATURES_SYS --> PRIVACY[隱私保護<br/>本地處理選項]
+            FEATURES_SYS --> COST[成本控制<br/>免費模式]
+            FEATURES_SYS --> FLEXIBLE[高度彈性<br/>模組化設計]
+            FEATURES_SYS --> SECURE[安全機制<br/>SQL注入防護]
+        end
+    end
+    
+    %% 樣式定義
+    classDef inputClass fill:#e3f2fd,stroke:#1976d2
+    classDef aiClass fill:#f3e5f5,stroke:#7b1fa2
+    classDef storageClass fill:#fff3e0,stroke:#f57c00
+    classDef featureClass fill:#e8f5e9,stroke:#388e3c
+    classDef uiClass fill:#fce4ec,stroke:#c2185b
+    classDef deployClass fill:#e0f2f1,stroke:#00796b
+    classDef sysClass fill:#f5f5f5,stroke:#616161
+    
+    class PDF,OFFICE,WEB,DATA,NL,MULTI,BATCH inputClass
+    class GPT,CLAUDE_AI,OLLAMA_MODELS,OPENAI_EMB,HF_EMB aiClass
+    class CHROMA_DB,REDIS_DB,QDRANT_DB,POSTGRES,MYSQL_DB storageClass
+    class SEMANTIC,CONTEXT,NL2SQL,SAFE_EXEC,DOC_DB featureClass
+    class STREAMLIT_UI,FILE_UPLOAD,REALTIME,SCRIPT,TEST uiClass
+    class COMPOSE,VENV,SCALABLE deployClass
+    class PRIVACY,COST,FLEXIBLE,SECURE sysClass

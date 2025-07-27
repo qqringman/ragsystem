@@ -1,0 +1,110 @@
+graph LR
+    %% 頂層應用
+    subgraph "應用層"
+        APP[app.py<br/>Streamlit UI]
+        MAIN[main.py<br/>CLI]
+    end
+    
+    %% 核心層
+    subgraph "核心層"
+        RAG[rag_chain.py]
+        CONFIG[config/]
+    end
+    
+    %% 功能模組
+    subgraph "LLM 模組"
+        LLM[llm/<br/>provider_selector.py]
+        OPENAI[OpenAI]
+        CLAUDE[Claude]
+        OLLAMA[Ollama]
+    end
+    
+    subgraph "文件處理模組"
+        LOADER[loader/<br/>doc_parser.py]
+        PDF[PyPDFLoader]
+        WORD[WordLoader]
+        EXCEL[ExcelLoader]
+        TEXT[TextLoader]
+    end
+    
+    subgraph "向量資料庫模組"
+        VECTOR[vectorstore/<br/>index_manager.py]
+        CHROMA[Chroma]
+        REDIS[Redis]
+        QDRANT[Qdrant]
+        EMBED[Embeddings]
+    end
+    
+    subgraph "資料庫模組"
+        DB[db/<br/>sql_executor.py]
+        PG[PostgreSQL]
+        MYSQL[MySQL]
+    end
+    
+    subgraph "工具模組"
+        UTILS[utils/]
+        LOG[logger.py]
+        HIGH[highlighter.py]
+    end
+    
+    %% 依賴關係
+    APP --> RAG
+    MAIN --> RAG
+    APP --> CONFIG
+    MAIN --> CONFIG
+    
+    RAG --> LLM
+    RAG --> LOADER
+    RAG --> VECTOR
+    RAG --> DB
+    RAG --> UTILS
+    
+    LLM --> CONFIG
+    LLM --> OPENAI
+    LLM --> CLAUDE
+    LLM --> OLLAMA
+    
+    LOADER --> PDF
+    LOADER --> WORD
+    LOADER --> EXCEL
+    LOADER --> TEXT
+    
+    VECTOR --> CONFIG
+    VECTOR --> CHROMA
+    VECTOR --> REDIS
+    VECTOR --> QDRANT
+    VECTOR --> EMBED
+    
+    DB --> CONFIG
+    DB --> LLM
+    DB --> PG
+    DB --> MYSQL
+    
+    UTILS --> LOG
+    UTILS --> HIGH
+    
+    %% 外部依賴
+    subgraph "外部服務"
+        EXT_OPENAI[OpenAI API]
+        EXT_CLAUDE[Anthropic API]
+        EXT_OLLAMA[Ollama Service]
+        EXT_PG[PostgreSQL Server]
+        EXT_REDIS[Redis Server]
+    end
+    
+    OPENAI -.-> EXT_OPENAI
+    CLAUDE -.-> EXT_CLAUDE
+    OLLAMA -.-> EXT_OLLAMA
+    PG -.-> EXT_PG
+    REDIS -.-> EXT_REDIS
+    
+    %% 樣式
+    classDef appClass fill:#bbdefb,stroke:#1565c0
+    classDef coreClass fill:#ffccbc,stroke:#bf360c
+    classDef moduleClass fill:#c8e6c9,stroke:#2e7d32
+    classDef externalClass fill:#f5f5f5,stroke:#616161,stroke-dasharray: 5 5
+    
+    class APP,MAIN appClass
+    class RAG,CONFIG coreClass
+    class LLM,LOADER,VECTOR,DB,UTILS moduleClass
+    class EXT_OPENAI,EXT_CLAUDE,EXT_OLLAMA,EXT_PG,EXT_REDIS externalClass

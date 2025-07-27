@@ -1,0 +1,66 @@
+flowchart TB
+    %% 使用者互動
+    User[使用者] -->|輸入查詢| UI{介面選擇}
+    UI -->|Web| Streamlit[Streamlit<br/>app.py]
+    UI -->|CLI| CLI[命令列<br/>main.py]
+    
+    %% 檔案上傳流程
+    User -->|上傳檔案| FileUpload[檔案上傳]
+    FileUpload --> DocParser[loader/<br/>文件解析器]
+    
+    %% 主要處理流程
+    Streamlit --> RAGChain[rag_chain.py<br/>核心引擎]
+    CLI --> RAGChain
+    
+    %% 配置管理
+    Config[config/<br/>配置管理] -.->|提供設定| RAGChain
+    Config -.->|API Keys| LLMProvider
+    Config -.->|連接參數| VectorDB
+    Config -.->|資料庫設定| SQLExecutor
+    
+    %% 資料來源分支
+    RAGChain --> SourceCheck{資料來源}
+    
+    %% 文件查詢路徑
+    SourceCheck -->|docs| DocQuery[文件查詢]
+    DocParser -->|分割文件| TextSplitter[文字分割器<br/>chunk_size=1000]
+    TextSplitter -->|文件片段| Embeddings[嵌入模型]
+    Embeddings -->|向量化| VectorDB[(向量資料庫)]
+    DocQuery -->|相似度搜尋| VectorDB
+    VectorDB -->|相關文件| ContextBuilder[上下文構建]
+    
+    %% 資料庫查詢路徑
+    SourceCheck -->|db| DBQuery[資料庫查詢]
+    DBQuery --> NLtoSQL[自然語言<br/>轉 SQL]
+    NLtoSQL --> LLMProvider[LLM 提供者]
+    LLMProvider -->|生成 SQL| SQLExecutor[SQL 執行器]
+    SQLExecutor --> Database[(PostgreSQL/<br/>MySQL)]
+    Database -->|查詢結果| ResultFormatter[結果格式化]
+    
+    %% LLM 生成答案
+    ContextBuilder --> LLMProvider
+    ResultFormatter --> LLMProvider
+    LLMProvider -->|生成答案| ResponseBuilder[回應構建]
+    
+    %% 結果返回
+    ResponseBuilder --> Highlighter[文字高亮]
+    Highlighter --> FinalResult[最終結果]
+    FinalResult -->|顯示| User
+    
+    %% 日誌記錄
+    Logger[utils/<br/>日誌系統] -.->|記錄| RAGChain
+    Logger -.->|記錄| DocParser
+    Logger -.->|記錄| SQLExecutor
+    
+    %% 樣式定義
+    classDef userNode fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef coreNode fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef dataNode fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef llmNode fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef dbNode fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    
+    class User,FileUpload userNode
+    class RAGChain,Config coreNode
+    class VectorDB,Database dataNode
+    class LLMProvider,Embeddings llmNode
+    class SQLExecutor,NLtoSQL dbNode

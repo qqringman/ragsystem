@@ -1,0 +1,100 @@
+mindmap
+  root((RAG 全功能系統))
+    [核心引擎]
+      (rag_chain.py)
+        查詢處理
+        結果聚合
+        流程控制
+      (config/)
+        環境變數管理
+        預設配置
+        配置驗證
+    
+    [LLM 層]
+      (llm/)
+        {{OpenAI GPT}}
+          gpt-3.5-turbo
+          gpt-4
+        {{Anthropic Claude}}
+          claude-3-opus
+          claude-3-sonnet
+        {{Ollama 本地}}
+          llama3
+          mistral
+          gemma
+    
+    [文件處理層]
+      (loader/)
+        PDF 載入
+        Word 文件
+        Excel 表格
+        Markdown
+        HTML/JSON
+        純文字
+      (文字分割)
+        RecursiveCharacterTextSplitter
+        chunk_size=1000
+        chunk_overlap=100
+    
+    [向量資料庫層]
+      (vectorstore/)
+        {{Chroma}}
+          本地持久化
+          預設選項
+        {{Redis}}
+          分散式
+          快取功能
+        {{Qdrant}}
+          高效能
+          雲端支援
+      (嵌入模型)
+        OpenAI Embeddings
+        HuggingFace
+          all-MiniLM-L6-v2
+          中文模型
+    
+    [資料庫層]
+      (db/)
+        {{PostgreSQL}}
+          結構化查詢
+          關聯分析
+        {{MySQL}}
+          替代選項
+        (功能)
+          NL to SQL
+          查詢執行
+          結果格式化
+    
+    [使用者介面]
+      (Web UI)
+        {{Streamlit}}
+          app.py
+          檔案上傳
+          即時查詢
+          結果展示
+      (CLI)
+        {{命令列}}
+          main.py
+          批次處理
+          測試工具
+    
+    [工具與支援]
+      (utils/)
+        文字高亮
+        日誌記錄
+        錯誤處理
+      (tests/)
+        單元測試
+        整合測試
+        效能測試
+    
+    [部署架構]
+      (容器化)
+        Docker
+        Docker Compose
+      (服務)
+        主應用 8501
+        PostgreSQL 5432
+        Redis 6379
+        Qdrant 6333
+        Ollama 11434

@@ -1,0 +1,72 @@
+graph TB
+    %% 使用者層
+    subgraph "使用者介面層"
+        USER[👤 使用者]
+        USER --> WEB[🌐 網頁介面<br/>Streamlit]
+        USER --> CLI[💻 命令列介面]
+    end
+    
+    %% 應用層
+    subgraph "應用邏輯層"
+        WEB --> CORE[🧠 RAG 核心引擎<br/>rag_chain.py]
+        CLI --> CORE
+        CONFIG[⚙️ 配置管理<br/>config/] --> CORE
+    end
+    
+    %% 處理層
+    subgraph "智慧處理層"
+        CORE --> PROCESS{處理類型}
+        
+        PROCESS -->|文件查詢| DOC_FLOW[📄 文件處理流程]
+        DOC_FLOW --> PARSE[解析文件<br/>PDF/Word/Excel/etc]
+        PARSE --> SPLIT[分割文字<br/>Chunks]
+        SPLIT --> EMBED[向量化<br/>Embeddings]
+        EMBED --> VECTOR_STORE[存入向量DB]
+        VECTOR_STORE --> SEARCH[相似度搜尋]
+        
+        PROCESS -->|資料庫查詢| DB_FLOW[🗄️ 資料庫流程]
+        DB_FLOW --> NL2SQL[自然語言→SQL]
+        NL2SQL --> EXECUTE[執行查詢]
+        EXECUTE --> FORMAT[格式化結果]
+    end
+    
+    %% AI 層
+    subgraph "AI 模型層"
+        SEARCH --> LLM[🤖 語言模型]
+        FORMAT --> LLM
+        NL2SQL --> LLM
+        
+        LLM_OPTIONS[模型選項]
+        LLM_OPTIONS --> FREE_LLM[免費: Ollama<br/>Llama3/Mistral]
+        LLM_OPTIONS --> PAID_LLM[付費: OpenAI/Claude]
+        
+        EMBED_OPTIONS[嵌入選項]
+        EMBED_OPTIONS --> FREE_EMBED[免費: HuggingFace]
+        EMBED_OPTIONS --> PAID_EMBED[付費: OpenAI]
+    end
+    
+    %% 儲存層
+    subgraph "資料儲存層"
+        VECTOR_STORE -.-> VDBS[(向量資料庫<br/>Chroma/Redis/Qdrant)]
+        EXECUTE -.-> RDBS[(關聯式資料庫<br/>PostgreSQL/MySQL)]
+    end
+    
+    %% 結果返回
+    LLM --> RESULT[📊 生成答案]
+    RESULT --> HIGHLIGHT[✨ 重點標註]
+    HIGHLIGHT --> USER
+    
+    %% 樣式
+    classDef userStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
+    classDef coreStyle fill:#fff3e0,stroke:#e65100,stroke-width:3px
+    classDef processStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef aiStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef dbStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef resultStyle fill:#fff9c4,stroke:#f57f17,stroke-width:3px
+    
+    class USER,WEB,CLI userStyle
+    class CORE,CONFIG coreStyle
+    class DOC_FLOW,DB_FLOW,PARSE,SPLIT,EMBED,SEARCH,NL2SQL,EXECUTE,FORMAT processStyle
+    class LLM,FREE_LLM,PAID_LLM,FREE_EMBED,PAID_EMBED aiStyle
+    class VDBS,RDBS dbStyle
+    class RESULT,HIGHLIGHT resultStyle
