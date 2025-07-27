@@ -36,3 +36,8 @@ logs/
 *.temp
 temp/
 tmp/
+.pytest_cache
+
+# DataBase
+chroma.sqlite3
+vector_db/chroma/chroma.sqlite3
