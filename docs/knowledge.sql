@@ -1,0 +1,1 @@
+SELECT * FROM knowledge_base WHERE topic = 'RAG';

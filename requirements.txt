@@ -1,0 +1,11 @@
+langchain
+openai
+streamlit
+chromadb
+python-docx
+pymysql
+psycopg2
+redis
+qdrant-client
+anthropic
+sentence-transformers
