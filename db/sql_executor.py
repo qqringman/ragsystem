@@ -1,8 +1,9 @@
-import os
 import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Dict, Any
 import logging
+from config import get_config
+from llm.provider_selector import get_llm
 
 # 設定日誌
 logger = logging.getLogger(__name__)
@@ -32,10 +33,9 @@ def query_database(nl_query: str) -> List[Dict[str, Any]]:
 
 def nl_to_sql(nl_query: str) -> str:
     """將自然語言轉換為 SQL"""
-    from llm.provider_selector import get_llm
-    
-    # 獲取資料庫結構資訊（實際應用中應從資料庫動態獲取）
+    # 獲取資料庫結構資訊
     db_schema = get_database_schema()
+    db_type = get_config("DB_TYPE", "postgresql")
     
     system_prompt = f"""你是一個資料庫查詢助手。根據以下資料庫結構，將自然語言問題轉換為 SQL 查詢語句。
 
@@ -44,7 +44,7 @@ def nl_to_sql(nl_query: str) -> str:
 
 規則：
 1. 只使用上述提到的資料表和欄位
-2. 生成的 SQL 必須是有效的 {os.getenv('DB_TYPE', 'postgresql')} 語法
+2. 生成的 SQL 必須是有效的 {db_type} 語法
 3. 只返回 SQL 語句，不要包含任何解釋
 4. 對於聚合查詢，記得使用 GROUP BY
 5. 使用適當的 JOIN 來連接相關資料表
@@ -98,12 +98,12 @@ def execute_sql(sql: str, params: Dict[str, Any] = None) -> List[Dict[str, Any]]
 
 def get_db_config() -> str:
     """獲取資料庫連接字串"""
-    db_type = os.getenv("DB_TYPE", "postgresql")
-    user = os.getenv("DB_USER", "raguser")
-    password = os.getenv("DB_PASSWORD", "ragpass")
-    host = os.getenv("DB_HOST", "localhost")
-    port = os.getenv("DB_PORT", "5432" if db_type == "postgresql" else "3306")
-    db_name = os.getenv("DB_NAME", "ragdb")
+    db_type = get_config("DB_TYPE", "postgresql")
+    user = get_config("DB_USER", "raguser")
+    password = get_config("DB_PASSWORD", "ragpass")
+    host = get_config("DB_HOST", "localhost")
+    port = get_config("DB_PORT", "5432" if db_type == "postgresql" else "3306")
+    db_name = get_config("DB_NAME", "ragdb")
     
     # 建構連接字串
     if db_type == "postgresql":
@@ -126,7 +126,6 @@ def create_engine(connection_string: str):
 def get_database_schema() -> str:
     """獲取資料庫結構（示例）"""
     # 實際應用中，這應該從資料庫動態讀取
-    # 可以使用 SQLAlchemy 的 Inspector
     return """
 資料表：
 1. products (產品表)

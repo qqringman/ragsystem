@@ -1,12 +1,20 @@
+# -*- coding: utf-8 -*-
 import os
 from pathlib import Path
 import streamlit as st
 from rag_chain import run_rag
 import tempfile
-from dotenv import load_dotenv
 import sys
 
-load_dotenv()
+# 配置系統會自動載入 .env
+from config import get_config, validate_config
+
+# 驗證配置
+try:
+    validate_config()
+except ValueError as e:
+    st.error(f"配置錯誤: {e}")
+    st.stop()
 
 print("🔍 正在執行的 Python 版本:", sys.executable)
 

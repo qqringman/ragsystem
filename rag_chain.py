@@ -1,9 +1,10 @@
-
+# -*- coding: utf-8 -*-
 from loader.doc_parser import load_and_split_documents
 from vectorstore.index_manager import get_vectorstore
 from llm.provider_selector import get_llm
 from utils.highlighter import highlight_chunks
 from db.sql_executor import query_database
+from config import get_config
 
 def run_rag(query, sources, files=None):
     return run_query(query, sources, files)
@@ -12,12 +13,26 @@ def run_query(query, sources, files=None):
     results = []
 
     if "docs" in sources and files:
+        # 載入文件
         docs = load_and_split_documents(files)
+        
+        # 獲取向量資料庫
         vs = get_vectorstore()
         vs.add_documents(docs)
-        rel_docs = vs.similarity_search(query)
-        llm = get_llm(provider="claude")
-        answer = llm.predict(f"根據以下內容回答：{query}\n\n" + "\n\n".join([d.page_content for d in rel_docs]))
+        
+        # 搜尋相關文件
+        search_k = int(get_config("SEARCH_K", "5"))
+        rel_docs = vs.similarity_search(query, k=search_k)
+        
+        # 使用 LLM 生成答案
+        llm_provider = get_config("LLM_PROVIDER")
+        llm = get_llm(provider=llm_provider)
+        
+        # 構建提示
+        context = "\n\n".join([d.page_content for d in rel_docs])
+        prompt = f"根據以下內容回答問題：{query}\n\n內容：\n{context}"
+        
+        answer = llm.predict(prompt)
         highlighted = highlight_chunks(answer, rel_docs)
         results.append(("docs", answer, highlighted))
 

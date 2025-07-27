@@ -10,13 +10,10 @@
 from pathlib import Path
 import os
 from typing import Optional
+from dotenv import load_dotenv
 
-# 如果有 settings.py，匯入它
-try:
-    from .settings import Settings, get_settings, get_config as settings_get_config
-    HAS_SETTINGS = True
-except ImportError:
-    HAS_SETTINGS = False
+# 載入 .env 檔案（這很重要！）
+load_dotenv()
 
 # 專案根目錄
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -44,14 +41,6 @@ def get_config(key: str, default: Optional[str] = None) -> str:
     Returns:
         配置值
     """
-    # 如果有 settings.py，優先使用它
-    if HAS_SETTINGS:
-        try:
-            return settings_get_config(key, default)
-        except:
-            pass
-    
-    # 否則使用環境變數
     return os.getenv(key, default or DEFAULT_CONFIG.get(key, ""))
 
 
@@ -80,7 +69,3 @@ __all__ = [
     "PROJECT_ROOT",
     "DEFAULT_CONFIG",
 ]
-
-# 如果有 settings.py，也匯出它的內容
-if HAS_SETTINGS:
-    __all__.extend(["Settings", "get_settings"])
