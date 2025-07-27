@@ -1,0 +1,38 @@
+# 設定檔案
+.env
+.env.local
+.env.*.local
+
+# API 金鑰和憑證
+*.key
+*.pem
+credentials/
+
+# IDE 設定
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# 日誌檔案
+*.log
+logs/
+
+# 暫存檔案
+*.tmp
+*.temp
+temp/
+tmp/
