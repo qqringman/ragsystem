@@ -174,6 +174,25 @@ docker volume ls | grep rag-system
 docker volume prune
 ```
 
+### 容器套件管理
+
+```bash
+# 查看容器內已安裝的套件
+docker-compose exec app pip list
+
+# 查看特定套件版本
+docker-compose exec app pip show numpy
+
+# 匯出當前環境
+docker-compose exec app pip freeze > current-packages.txt
+
+# 在容器內更新套件
+docker-compose exec app pip install --upgrade numpy
+
+# 檢查過期套件
+docker-compose exec app pip list --outdated
+```
+
 ## 🔍 除錯技巧
 
 ### 1. 檢查服務健康狀態

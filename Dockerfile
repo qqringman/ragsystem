@@ -16,9 +16,11 @@ WORKDIR /app
 # 複製並清理 requirements
 COPY requirements.txt .
 
-# 安裝 Python 套件
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# 升級 pip 和安裝關鍵套件
+RUN pip install --upgrade pip setuptools wheel
+
+# 安裝其他 Python 套件
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 複製應用
 COPY . .

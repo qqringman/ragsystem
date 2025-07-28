@@ -1,52 +1,59 @@
-# Core LangChain - 使用最新兼容版本
-langchain
-langchain-community
-langchain-openai
-langchain-anthropic
-langchain-huggingface
+# Pydantic 2.11+ 核心套件
+pydantic==2.11.2
+pydantic-core==2.33.1
+pydantic-settings==2.7.0
 
-# LLM Providers
-openai==1.12.0
-anthropic
+# LangChain 生態系統 - 使用較新版本以支援 Pydantic 2.11+
+langchain==0.3.0
+langchain-community==0.3.0
+langchain-core==0.3.0
+langchain-openai==0.2.0
+langchain-anthropic==0.2.0
+langchain-huggingface==0.1.0
+langsmith==0.1.147
 
-# Vector Stores
-chromadb==0.4.22
+# LLM 提供者 - 使用支援 Pydantic 2.11+ 的版本
+anthropic==0.39.0
+openai==1.54.0
+ollama==0.5.1
+
+# 向量資料庫
+chromadb==0.5.0
 redis==5.0.1
-qdrant-client==1.7.1
+qdrant-client==1.12.0
 
-# Embeddings
-sentence-transformers
-tiktoken==0.5.2
-
-# Document Processing
-pypdf==3.17.4
-python-docx==1.1.0
-openpyxl==3.1.2
-unstructured==0.11.8
+# 文件處理 - 使用較新版本
+pypdf==5.1.0
+python-docx==1.1.2
+openpyxl==3.1.5
+unstructured==0.16.0
+unstructured-client==0.41.0
 python-magic==0.4.27
-python-multipart==0.0.6
+python-multipart==0.0.12
 
-# Database
-sqlalchemy==2.0.25
-psycopg2-binary==2.9.9
-pymysql==1.1.0
+# 嵌入和 ML
+sentence-transformers==3.3.0
+tiktoken==0.8.0
+scikit-learn==1.5.2
+numpy==1.26.4
+pandas==2.2.3
 
-# Web UI
-streamlit==1.31.0
+# Web 框架
+streamlit==1.40.0
+fastapi==0.115.0
+uvicorn==0.32.0
 
-# Utils
-python-dotenv==1.0.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
-numpy==1.26.3
-pandas==2.1.4
+# 資料庫
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+pymysql==1.1.1
 
-# Async
-aiohttp==3.9.1
-
-# Logging
+# 工具
+python-dotenv==1.0.1
 loguru==0.7.2
+aiohttp==3.11.0
+httpx==0.28.0
 
-# Testing
-pytest==7.4.4
-pytest-asyncio==0.23.3
+# 測試
+pytest==8.3.3
+pytest-asyncio==0.24.0
