@@ -19,6 +19,7 @@ ollama==0.5.1
 
 # 向量資料庫
 chromadb==0.5.0
+langchain-chroma==0.1.4
 redis==5.0.1
 qdrant-client==1.12.0
 
