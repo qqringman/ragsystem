@@ -1,7 +1,7 @@
 services:
   # 主應用程式
   app:
-    command: ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    command: ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.fileWatcherType=auto"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -13,15 +13,33 @@ services:
       - "8501:8501"
     environment:
       - PYTHONUNBUFFERED=1
-      # Ollama 在 Docker 內部的連接
       - OLLAMA_BASE_URL=http://ollama:11434
+      # 開發模式標記
+      - DEV_MODE=true
+      # 解決權限問題
+      - CHROMA_SERVER_AUTH_PROVIDER=chromadb.auth.token.TokenAuthServerProvider
+      - CHROMA_SERVER_AUTH_CREDENTIALS_PROVIDER=chromadb.auth.token.TokenAuthCredentialsProvider
+      - ANONYMIZED_TELEMETRY=false
     env_file:
       - .env
     volumes:
+      # 掛載源碼目錄（熱更新）
+      - ./app.py:/app/app.py:ro
+      - ./rag_chain.py:/app/rag_chain.py:ro
+      - ./config:/app/config:ro
+      - ./llm:/app/llm:ro
+      - ./loader:/app/loader:ro
+      - ./vectorstore:/app/vectorstore:ro
+      - ./db:/app/db:ro
+      - ./utils:/app/utils:ro
+      - ./ui:/app/ui:ro
+      # 資料目錄 - 使用 delegated 提升效能
       - ./docs:/app/docs
-      - ./vector_db:/app/vector_db
-      - ./uploads:/app/uploads
-      - ./logs:/app/logs
+      - ./vector_db:/app/vector_db:delegated
+      - ./uploads:/app/uploads:delegated
+      - ./logs:/app/logs:delegated
+    # 解決權限問題 - 使用與主機相同的用戶
+    user: "${UID:-1000}:${GID:-1000}"
     depends_on:
       - postgres
       - redis
@@ -35,7 +53,7 @@ services:
       timeout: 10s
       retries: 3
 
-  # Ollama LLM 服務（預設啟動）
+  # Ollama LLM 服務
   ollama:
     image: ollama/ollama:latest
     container_name: rag-ollama
@@ -51,14 +69,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    # 如果有 GPU，取消下面的註解
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
 
   # PostgreSQL 資料庫
   postgres:
@@ -82,7 +92,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis (用於向量資料庫快取)
+  # Redis (用於向量資料庫快取和 session)
   redis:
     image: redis:7-alpine
     container_name: rag-redis
@@ -111,7 +121,6 @@ services:
     networks:
       - rag-network
     restart: unless-stopped
-    # 有以下 2 行開機就不會自動運行 (要自動運行要把這2行 mark 掉)
     profiles:
       - qdrant
 

@@ -37,31 +37,78 @@ def get_vectorstore():
     if vec_type == "chroma":
         persist_dir = get_config("CHROMA_PERSIST_DIR", "vector_db/chroma")
         
-        # 確保目錄存在
+        # 確保目錄存在並有正確權限
         os.makedirs(persist_dir, exist_ok=True)
         
+        # 嘗試修復權限
         try:
-            # 嘗試使用客戶端設定來避免遙測問題
-            import chromadb
-            from chromadb.config import Settings
-            
-            # 創建客戶端設定
-            client_settings = Settings(
-                anonymized_telemetry=False,
-                telemetry=False,
-                persist_directory=persist_dir
-            )
-            
-            # 創建 Chroma 實例
-            return Chroma(
-                embedding_function=embedding,
-                persist_directory=persist_dir,
-                client_settings=client_settings,
-                collection_metadata={"hnsw:space": "cosine"}
-            )
+            os.chmod(persist_dir, 0o777)
+            # 如果已有 SQLite 檔案，也修復其權限
+            sqlite_files = [f for f in os.listdir(persist_dir) if f.endswith('.sqlite3')]
+            for sqlite_file in sqlite_files:
+                os.chmod(os.path.join(persist_dir, sqlite_file), 0o666)
         except Exception as e:
-            print(f"⚠️  使用預設 Chroma 設定: {e}")
-            # 如果失敗，使用簡單配置
+            print(f"⚠️  無法修改權限: {e}")
+            print("  請手動執行: sudo chmod -R 777 vector_db")
+        
+        try:
+            # 使用新版 ChromaDB API
+            import chromadb
+            
+            # 使用新的 PersistentClient API（ChromaDB 0.4+）
+            try:
+                # 嘗試新版 API
+                client = chromadb.PersistentClient(
+                    path=persist_dir,
+                    settings=chromadb.Settings(
+                        anonymized_telemetry=False,
+                        allow_reset=True
+                    )
+                )
+                
+                # 獲取或創建預設集合
+                collection_name = "langchain"
+                try:
+                    collection = client.get_collection(collection_name)
+                except:
+                    collection = client.create_collection(
+                        name=collection_name,
+                        metadata={"hnsw:space": "cosine"}
+                    )
+                
+                # 使用 Chroma 包裝器
+                from langchain_community.vectorstores import Chroma
+                return Chroma(
+                    client=client,
+                    collection_name=collection_name,
+                    embedding_function=embedding,
+                    persist_directory=persist_dir
+                )
+                
+            except AttributeError:
+                # 如果 PersistentClient 不存在，使用舊版 API
+                print("⚠️  使用舊版 ChromaDB API")
+                from chromadb.config import Settings
+                
+                client_settings = Settings(
+                    chroma_db_impl="duckdb+parquet",
+                    persist_directory=persist_dir,
+                    anonymized_telemetry=False
+                )
+                
+                return Chroma(
+                    embedding_function=embedding,
+                    persist_directory=persist_dir,
+                    client_settings=client_settings,
+                    collection_metadata={"hnsw:space": "cosine"}
+                )
+                
+        except Exception as e:
+            print(f"⚠️  ChromaDB 初始化失敗: {e}")
+            print("  嘗試使用最簡單的配置...")
+            
+            # 最後的備案：使用最簡單的配置
+            from langchain_community.vectorstores import Chroma
             return Chroma(
                 embedding_function=embedding,
                 persist_directory=persist_dir

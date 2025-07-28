@@ -164,6 +164,7 @@ show_main_menu() {
     echo -e "${CYAN}│${NC}  ${WHITE}4)${NC} 📊 詳細狀態                                    ${CYAN}│${NC}"
     echo -e "${CYAN}│${NC}  ${WHITE}5)${NC} 📜 查看日誌                                    ${CYAN}│${NC}"
     echo -e "${CYAN}│${NC}  ${WHITE}6)${NC} ⚙️  系統設定                                    ${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  ${WHITE}7)${NC} 🔥 熱更新程式碼                                ${CYAN}│${NC}"
     echo -e "${CYAN}│${NC}  ${WHITE}0)${NC} 🚪 退出                                        ${CYAN}│${NC}"
     echo -e "${CYAN}│${NC}                                                    ${CYAN}│${NC}"
     echo -e "${CYAN}└────────────────────────────────────────────────────┘${NC}"
@@ -554,6 +555,85 @@ system_settings_menu() {
     done
 }
 
+# 熱更新程式碼
+hot_reload_code() {
+    show_header
+    echo -e "${CYAN}┌─ 熱更新程式碼 ─────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC}                                                     ${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  ${WHITE}說明：${NC}                                           ${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  Docker 模式下會自動檢測檔案變更並重載            ${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  本地模式下 Streamlit 會自動偵測變更              ${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}                                                     ${CYAN}│${NC}"
+    echo -e "${CYAN}└─────────────────────────────────────────────────────┘${NC}"
+    echo
+    
+    # 檢查運行模式
+    local mode=$(cat "$STATE_FILE" 2>/dev/null || echo "none")
+    
+    if [ "$mode" == "none" ]; then
+        echo -e "${YELLOW}系統未運行，無需更新${NC}"
+        read -p "按 Enter 鍵返回..."
+        return
+    fi
+    
+    if [ "$mode" == "docker" ]; then
+        echo -e "${BLUE}Docker 模式熱更新選項：${NC}"
+        echo
+        echo -e "  ${WHITE}1)${NC} 🔄 重新載入應用（保持容器運行）"
+        echo -e "  ${WHITE}2)${NC} 📦 更新 Python 套件（requirements.txt）"
+        echo -e "  ${WHITE}3)${NC} 🐳 重建映像（完整更新）"
+        echo -e "  ${WHITE}0)${NC} ↩️  返回"
+        echo
+        
+        read -p "$(echo -e ${WHITE}請選擇 [0-3]: ${NC})" choice
+        
+        case $choice in
+            1)
+                echo -e "\n${BLUE}重新載入應用...${NC}"
+                # 觸發 Streamlit 重載
+                docker-compose exec app touch /app/app.py
+                echo -e "${GREEN}✅ 應用已重新載入${NC}"
+                echo -e "${GRAY}提示：Streamlit 會自動偵測檔案變更${NC}"
+                ;;
+            2)
+                echo -e "\n${BLUE}更新 Python 套件...${NC}"
+                docker-compose exec app pip install -r requirements.txt
+                echo -e "${GREEN}✅ 套件更新完成${NC}"
+                echo -e "${YELLOW}建議重啟應用以確保生效${NC}"
+                ;;
+            3)
+                echo -e "\n${YELLOW}這將重建整個映像，需要一些時間${NC}"
+                read -p "確定要繼續嗎？[y/N]: " -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    echo -e "${BLUE}重建 Docker 映像...${NC}"
+                    docker-compose build --no-cache app
+                    echo -e "${GREEN}✅ 映像重建完成${NC}"
+                    echo -e "${YELLOW}請重啟系統以使用新映像${NC}"
+                fi
+                ;;
+            0)
+                return
+                ;;
+        esac
+    else
+        # 本地模式
+        echo -e "${GREEN}本地模式說明：${NC}"
+        echo
+        echo "Streamlit 已啟用檔案監視功能，會自動偵測以下變更："
+        echo "  • Python 檔案（.py）修改"
+        echo "  • 配置檔案（.env）修改"
+        echo
+        echo -e "${YELLOW}如果需要更新 Python 套件：${NC}"
+        echo "  1. 停止系統"
+        echo "  2. pip install -r requirements.txt"
+        echo "  3. 重新啟動系統"
+    fi
+    
+    echo
+    read -p "按 Enter 鍵返回..."
+}
+
 # 主循環
 main_loop() {
     while true; do
@@ -561,7 +641,7 @@ main_loop() {
         show_system_status
         show_main_menu
         
-        read -p "$(echo -e ${WHITE}請選擇操作 [0-6]: ${NC})" choice
+        read -p "$(echo -e ${WHITE}請選擇操作 [0-7]: ${NC})" choice
         
         case $choice in
             1)
@@ -602,6 +682,9 @@ main_loop() {
                 ;;
             6)
                 system_settings_menu
+                ;;
+            7)
+                hot_reload_code
                 ;;
             0)
                 echo
