@@ -37,6 +37,8 @@ logs/
 temp/
 tmp/
 .pytest_cache
+.rag-system-state
+.docker-build-time
 
 # DataBase
 chroma.sqlite3
