@@ -46,13 +46,16 @@ case $choice in
         
         # 列出主要 Python 檔案
         FILES=(
-            "app.py"
+            "api_server.py"
             "rag_chain.py"
             "config/__init__.py"
             "llm/provider_selector.py"
             "loader/doc_parser.py"
             "vectorstore/index_manager.py"
             "db/sql_executor.py"
+            "static/index.html"
+            "static/style.css"
+            "static/app.js"
         )
         
         CHANGED_FILES=()
@@ -82,9 +85,9 @@ case $choice in
                 echo -e "${GREEN}✓${NC} 更新 $file"
             done
             
-            # 觸發 Streamlit 重載
+            # 觸發應用重載
             echo -e "\n${BLUE}觸發應用重載...${NC}"
-            docker exec rag-app touch /app/app.py
+            docker exec rag-app touch /app/api_server.py
             
             echo -e "\n${GREEN}✅ 熱更新完成！${NC}"
             echo "應用將在幾秒內自動重載"
@@ -150,9 +153,9 @@ echo -e "\n${BLUE}檢查應用狀態...${NC}"
 sleep 3
 
 # 檢查健康狀態
-if curl -s http://localhost:8501/_stcore/health >/dev/null 2>&1; then
+if curl -s http://localhost:7777 >/dev/null 2>&1; then
     echo -e "${GREEN}✅ 應用運行正常${NC}"
-    echo -e "\n訪問: ${BLUE}http://localhost:8501${NC}"
+    echo -e "\n訪問: ${BLUE}http://localhost:7777${NC}"
 else
     echo -e "${YELLOW}⚠️  應用可能還在啟動中，請稍後再試${NC}"
 fi

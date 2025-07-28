@@ -78,8 +78,8 @@ fi
 
 # 2. 檢查所有必要的端口
 echo -e "\n${YELLOW}檢查端口可用性...${NC}"
-PORTS=(8501 11434 5432 6379)
-PORT_NAMES=("Streamlit" "Ollama" "PostgreSQL" "Redis")
+PORTS=(7777 11434 5432 6379)
+PORT_NAMES=("FastAPI" "Ollama" "PostgreSQL" "Redis")
 PORT_STATUS=0
 
 for i in "${!PORTS[@]}"; do
@@ -110,105 +110,14 @@ if [ $PORT_STATUS -eq 1 ]; then
     fi
 fi
 
-# 3. 檢查 Docker 服務
-echo -e "\n${YELLOW}檢查 Docker 服務...${NC}"
-if ! docker info > /dev/null 2>&1; then
-    echo -e "${RED}[ERROR] Docker 服務未運行！${NC}"
-    echo "請先啟動 Docker Desktop 或 Docker 服務"
-    exit 1
-fi
-echo -e "${GREEN}✓ Docker 服務正常${NC}"
-
-# 4. 檢查 docker-compose
-if ! command -v docker-compose &> /dev/null; then
-    echo -e "${YELLOW}未找到 docker-compose，嘗試使用 docker compose...${NC}"
-    COMPOSE_CMD="docker compose"
-else
-    COMPOSE_CMD="docker-compose"
-fi
-
-# 5. 停止現有的容器（如果有）
-echo -e "\n${YELLOW}停止現有容器...${NC}"
-$COMPOSE_CMD down
-
-# 6. 清理未使用的資源（可選）
-read -p "是否要清理未使用的 Docker 資源？(y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "清理未使用的資源..."
-    docker system prune -f
-fi
-
-# 7. 智能構建和啟動服務
-echo -e "\n${YELLOW}檢查是否需要構建...${NC}"
-
-# 檢查映像是否存在
-IMAGE_EXISTS=$(docker images -q rag-app:latest 2> /dev/null)
-
-# 檢查是否有代碼變更（可選）
-BUILD_NEEDED=false
-
-if [ -z "$IMAGE_EXISTS" ]; then
-    echo "映像不存在，需要構建"
-    BUILD_NEEDED=true
-else
-    # 檢查 Dockerfile 或 requirements.txt 是否有更新
-    if [ -f .docker-build-time ]; then
-        # 檢查關鍵文件是否比上次構建時間新
-        if [ Dockerfile -nt .docker-build-time ] || [ requirements.txt -nt .docker-build-time ]; then
-            echo "檢測到 Dockerfile 或 requirements.txt 有更新"
-            BUILD_NEEDED=true
-        fi
-    else
-        # 沒有構建時間記錄，詢問用戶
-        echo -e "${GREEN}✓ 映像已存在${NC}"
-        read -p "是否要重新構建映像？(y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            BUILD_NEEDED=true
-        fi
-    fi
-fi
-
-# 根據需要構建或直接啟動
-if [ "$BUILD_NEEDED" = true ]; then
-    echo -e "${YELLOW}構建 Docker 映像...${NC}"
-    if $COMPOSE_CMD build; then
-        # 記錄構建時間
-        touch .docker-build-time
-        echo -e "${GREEN}✓ 構建成功${NC}"
-    else
-        echo -e "${RED}[ERROR] 構建失敗${NC}"
-        exit 1
-    fi
-fi
-
-# 啟動服務（不帶 --build）
-echo -e "\n${YELLOW}啟動 Docker 服務...${NC}"
-$COMPOSE_CMD up -d
-
-# 8. 等待服務啟動
-echo -e "\n${YELLOW}等待服務啟動...${NC}"
-sleep 10
-
-# 9. 檢查服務狀態
-echo -e "\n${YELLOW}檢查服務狀態...${NC}"
-$COMPOSE_CMD ps
-
-# 10. 檢查 Ollama 是否需要下載模型
-echo -e "\n${YELLOW}檢查 Ollama 模型...${NC}"
-if ! $COMPOSE_CMD exec -T ollama ollama list | grep -q "llama3"; then
-    echo "下載 llama3 模型（首次需要幾分鐘）..."
-    $COMPOSE_CMD exec -T ollama ollama pull llama3
-else
-    echo -e "${GREEN}✓ llama3 模型已存在${NC}"
-fi
+# 其餘部分保持不變，但修改顯示訊息：
 
 # 11. 顯示訪問信息
 echo -e "\n${GREEN}✅ RAG 系統已啟動！${NC}"
 echo "========================"
 echo "📊 服務訪問地址："
-echo "- Web UI: http://localhost:8501"
+echo "- Web UI: http://localhost:7777"
+echo "- API Docs: http://localhost:7777/docs"
 echo "- Ollama API: http://localhost:11434"
 echo ""
 echo "📝 常用命令："

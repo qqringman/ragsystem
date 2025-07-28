@@ -1,10 +1,11 @@
-// RAG 智能助手前端 JavaScript
+// RAG 智能助手前端 JavaScript - 增強版
 
 // 全局變量
 let sessionId = localStorage.getItem('sessionId') || generateUUID();
 let messages = [];
 let uploadedFiles = [];
 let kbFiles = [];
+let currentStreamController = null;
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
@@ -127,8 +128,8 @@ async function sendMessage() {
     if (document.getElementById('source-docs').checked) sources.push('docs');
     if (document.getElementById('source-db').checked) sources.push('db');
     
-    // 顯示載入動畫
-    showLoading();
+    // 顯示思考中動畫
+    const thinkingMessageId = showThinkingAnimation();
     
     try {
         let response;
@@ -170,8 +171,11 @@ async function sendMessage() {
         
         const data = await response.json();
         
-        // 添加助手回應
-        addMessage('assistant', data.answer, data.sources);
+        // 移除思考中動畫
+        removeThinkingAnimation(thinkingMessageId);
+        
+        // 添加助手回應（使用流式效果）
+        addStreamingMessage('assistant', data.answer, data.sources);
         
         // 清空臨時檔案
         uploadedFiles = [];
@@ -179,9 +183,47 @@ async function sendMessage() {
         
     } catch (error) {
         console.error('Error:', error);
+        removeThinkingAnimation(thinkingMessageId);
         addMessage('assistant', '抱歉，處理您的請求時發生錯誤。請稍後再試。');
-    } finally {
-        hideLoading();
+    }
+}
+
+// 顯示思考中動畫
+function showThinkingAnimation() {
+    const messageId = `thinking-${Date.now()}`;
+    const chatContainer = document.getElementById('chat-container');
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message assistant';
+    messageDiv.id = messageId;
+    
+    messageDiv.innerHTML = `
+        <div class="message-avatar">🤖</div>
+        <div class="message-content">
+            <div class="message-bubble">
+                <div class="thinking-animation">
+                    <span>思考中</span>
+                    <div class="thinking-dots">
+                        <span class="thinking-dot"></span>
+                        <span class="thinking-dot"></span>
+                        <span class="thinking-dot"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    chatContainer.appendChild(messageDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    
+    return messageId;
+}
+
+// 移除思考中動畫
+function removeThinkingAnimation(messageId) {
+    const thinkingMessage = document.getElementById(messageId);
+    if (thinkingMessage) {
+        thinkingMessage.remove();
     }
 }
 
@@ -210,8 +252,94 @@ function addMessage(role, content, sources = []) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
+// 添加流式訊息
+function addStreamingMessage(role, content, sources = []) {
+    const message = {
+        role: role,
+        content: content,
+        sources: sources,
+        timestamp: new Date().toISOString()
+    };
+    
+    messages.push(message);
+    
+    const chatContainer = document.getElementById('chat-container');
+    const messageDiv = createMessageElement(message, true);
+    chatContainer.appendChild(messageDiv);
+    
+    // 流式顯示文字
+    const textElement = messageDiv.querySelector('.message-text');
+    streamText(textElement, content, () => {
+        // 添加來源標籤
+        if (sources && sources.length > 0) {
+            const bubble = messageDiv.querySelector('.message-bubble');
+            const sourcesDiv = document.createElement('div');
+            sourcesDiv.className = 'message-sources';
+            
+            sources.forEach(source => {
+                const tag = document.createElement('span');
+                tag.className = `source-tag source-${source}`;
+                tag.textContent = source.toUpperCase();
+                sourcesDiv.appendChild(tag);
+            });
+            
+            bubble.appendChild(sourcesDiv);
+        }
+    });
+    
+    // 滾動到底部
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+// 流式顯示文字
+function streamText(element, text, onComplete) {
+    element.textContent = '';
+    element.classList.add('typing');
+    
+    let index = 0;
+    const words = text.split('');
+    
+    // 創建一個新的流控制器
+    if (currentStreamController) {
+        currentStreamController.abort = true;
+    }
+    
+    currentStreamController = { abort: false };
+    const controller = currentStreamController;
+    
+    function addNextChar() {
+        if (controller.abort || index >= words.length) {
+            element.classList.remove('typing');
+            if (onComplete) onComplete();
+            return;
+        }
+        
+        element.textContent += words[index];
+        index++;
+        
+        // 根據字符類型調整延遲
+        let delay = 30; // 基礎延遲
+        if (words[index - 1] === '。' || words[index - 1] === '！' || words[index - 1] === '？') {
+            delay = 200; // 句子結束停頓
+        } else if (words[index - 1] === '，' || words[index - 1] === '；') {
+            delay = 100; // 逗號停頓
+        }
+        
+        // 保持滾動在底部
+        const chatContainer = document.getElementById('chat-container');
+        if (chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 100) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        setTimeout(addNextChar, delay);
+    }
+    
+    // 開始流式顯示
+    setTimeout(addNextChar, 100);
+}
+
 // 創建訊息元素
-function createMessageElement(message) {
+function createMessageElement(message, isStreaming = false) {
     const div = document.createElement('div');
     div.className = `message ${message.role}`;
     
@@ -227,12 +355,14 @@ function createMessageElement(message) {
     
     const text = document.createElement('div');
     text.className = 'message-text';
-    text.textContent = message.content;
+    if (!isStreaming) {
+        text.textContent = message.content;
+    }
     
     bubble.appendChild(text);
     
-    // 添加來源標籤
-    if (message.sources && message.sources.length > 0) {
+    // 如果不是流式，直接添加來源標籤
+    if (!isStreaming && message.sources && message.sources.length > 0) {
         const sourcesDiv = document.createElement('div');
         sourcesDiv.className = 'message-sources';
         
@@ -363,7 +493,7 @@ async function addToKnowledgeBase() {
         formData.append('files', file);
     });
     
-    showLoading();
+    showLoadingWithMessage('正在處理並索引檔案...');
     
     try {
         const response = await fetch('/api/knowledge-base/add', {
@@ -396,7 +526,7 @@ async function clearKnowledgeBase() {
         return;
     }
     
-    showLoading();
+    showLoadingWithMessage('正在清空知識庫...');
     
     try {
         const response = await fetch('/api/knowledge-base/clear', {
@@ -500,6 +630,31 @@ function showLoading() {
     document.getElementById('loading-overlay').classList.add('active');
 }
 
+// 顯示帶訊息的載入動畫
+function showLoadingWithMessage(message) {
+    const overlay = document.getElementById('loading-overlay');
+    const loadingContent = overlay.querySelector('.loading-content') || createLoadingContent();
+    const messageElement = loadingContent.querySelector('.loading-message');
+    
+    if (messageElement) {
+        messageElement.textContent = message;
+    }
+    
+    overlay.classList.add('active');
+}
+
+// 創建載入內容
+function createLoadingContent() {
+    const overlay = document.getElementById('loading-overlay');
+    overlay.innerHTML = `
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p class="loading-message">處理中...</p>
+        </div>
+    `;
+    return overlay.querySelector('.loading-content');
+}
+
 // 隱藏載入動畫
 function hideLoading() {
     document.getElementById('loading-overlay').classList.remove('active');
@@ -521,3 +676,31 @@ document.getElementById('help-modal').addEventListener('click', (e) => {
         closeHelp();
     }
 });
+
+// WebSocket 支援（未來功能）
+function connectWebSocket() {
+    const ws = new WebSocket(`ws://localhost:7777/ws/${sessionId}`);
+    
+    ws.onopen = () => {
+        console.log('WebSocket connected');
+    };
+    
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'response') {
+            // 處理響應
+        }
+    };
+    
+    ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+    };
+    
+    ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        // 嘗試重連
+        setTimeout(connectWebSocket, 5000);
+    };
+    
+    return ws;
+}

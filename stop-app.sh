@@ -96,10 +96,10 @@ stop_by_name() {
 echo -e "${RED}🛑 停止 RAG System${NC}"
 echo "================================"
 
-# 1. 停止 Streamlit
-echo -e "\n${BLUE}1. 停止 Streamlit${NC}"
-stop_service "streamlit"
-stop_by_name "streamlit run" "Streamlit"
+# 1. 停止 API Server
+echo -e "\n${BLUE}1. 停止 API Server${NC}"
+stop_service "api_server"
+stop_by_name "api_server.py" "API Server"
 
 # 2. 停止 Ollama（如果有）
 if [ "$LLM_PROVIDER" == "ollama" ] || [ -f "$PID_DIR/ollama.pid" ]; then
@@ -126,7 +126,7 @@ fi
 echo -e "\n${BLUE}4. 清理殘留進程${NC}"
 
 # 檢查特定端口
-for port in 8501 11434; do
+for port in 7777 11434; do
     local pid=$(lsof -t -i:$port 2>/dev/null)
     if [ -n "$pid" ]; then
         echo -e "${YELLOW}清理占用端口 $port 的進程 (PID: $pid)${NC}"
@@ -150,7 +150,7 @@ fi
 echo -e "\n${BLUE}6. 檢查最終狀態${NC}"
 
 # 檢查是否還有相關進程
-PROCESSES=("streamlit" "ollama" "redis-server")
+PROCESSES=("api_server" "ollama" "redis-server")
 FOUND_PROCESSES=false
 
 for proc in "${PROCESSES[@]}"; do
@@ -167,7 +167,7 @@ fi
 
 # 檢查端口
 echo -e "\n檢查端口狀態："
-for port in 8501 11434 6379; do
+for port in 7777 11434 6379; do
     if lsof -i:$port >/dev/null 2>&1; then
         echo -e "${YELLOW}⚠ 端口 $port 仍被占用${NC}"
     else
@@ -193,4 +193,4 @@ fi
 
 echo -e "\n${BLUE}提示：${NC}"
 echo "  - 重新啟動: ./start-app.sh"
-echo "  - 查看是否有殘留進程: ps aux | grep -E 'streamlit|ollama|redis'"
+echo "  - 查看是否有殘留進程: ps aux | grep -E 'api_server|ollama|redis'"

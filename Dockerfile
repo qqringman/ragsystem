@@ -30,10 +30,6 @@ RUN mkdir -p /app/vector_db /app/uploads /app/logs
 
 ENV PYTHONUNBUFFERED=1
 
-EXPOSE 8501
+EXPOSE 7777
 
-CMD ["streamlit", "run", "app.py", \
-     "--server.port=8501", \
-     "--server.address=0.0.0.0", \
-     "--server.headless=true", \
-     "--browser.serverAddress=0.0.0.0"]
+CMD ["python3", "api_server.py"]

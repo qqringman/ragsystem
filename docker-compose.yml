@@ -1,7 +1,7 @@
 services:
   # 主應用程式
   app:
-    command: ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.fileWatcherType=auto"]
+    command: ["python3", "api_server.py"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -10,7 +10,7 @@ services:
     image: rag-app:latest
     container_name: rag-app
     ports:
-      - "8501:8501"
+      - "7777:7777"
     environment:
       - PYTHONUNBUFFERED=1
       - OLLAMA_BASE_URL=http://ollama:11434
@@ -24,7 +24,7 @@ services:
       - .env
     volumes:
       # 掛載源碼目錄（熱更新）
-      - ./app.py:/app/app.py:ro
+      - ./api_server.py:/app/api_server.py:ro
       - ./rag_chain.py:/app/rag_chain.py:ro
       - ./config:/app/config:ro
       - ./llm:/app/llm:ro
@@ -33,6 +33,7 @@ services:
       - ./db:/app/db:ro
       - ./utils:/app/utils:ro
       - ./ui:/app/ui:ro
+      - ./static:/app/static:ro
       # 資料目錄 - 使用 delegated 提升效能
       - ./docs:/app/docs
       - ./vector_db:/app/vector_db:delegated
@@ -48,7 +49,7 @@ services:
       - rag-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:7777"]
       interval: 30s
       timeout: 10s
       retries: 3

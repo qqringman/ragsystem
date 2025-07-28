@@ -17,7 +17,7 @@ class SimpleOllama:
         self.temperature = temperature
         print(f"🤖 初始化 Ollama: {model} @ {self.base_url}")
     
-    def predict(self, prompt):
+    def predict(self, prompt, stream=False):
         """直接調用 Ollama HTTP API"""
         try:
             # 嘗試 generate endpoint
@@ -25,40 +25,69 @@ class SimpleOllama:
             payload = {
                 "model": self.model,
                 "prompt": prompt,
-                "stream": False,
+                "stream": stream,
                 "options": {
-                    "temperature": self.temperature
+                    "temperature": self.temperature,
+                    "num_predict": 2048,  # 增加最大輸出長度
+                    "stop": ["<|im_end|>", "</s>"]  # 停止標記
                 }
             }
             
-            response = requests.post(url, json=payload, timeout=60)
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("response", "")
-            else:
-                # 如果 generate 失敗，嘗試 chat endpoint
-                chat_url = f"{self.base_url}/api/chat"
-                chat_payload = {
-                    "model": self.model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "stream": False,
-                    "options": {"temperature": self.temperature}
-                }
-                
-                chat_response = requests.post(chat_url, json=chat_payload, timeout=60)
-                if chat_response.status_code == 200:
-                    chat_result = chat_response.json()
-                    return chat_result.get("message", {}).get("content", "")
+            if stream:
+                # 流式響應
+                response = requests.post(url, json=payload, stream=True, timeout=300)
+                if response.status_code == 200:
+                    for line in response.iter_lines():
+                        if line:
+                            try:
+                                data = json.loads(line)
+                                if 'response' in data:
+                                    yield data['response']
+                                if data.get('done', False):
+                                    break
+                            except json.JSONDecodeError:
+                                continue
                 else:
-                    return f"Ollama API 錯誤: {response.status_code} - {response.text[:200]}"
+                    yield f"Ollama API 錯誤: {response.status_code}"
+            else:
+                # 非流式響應
+                response = requests.post(url, json=payload, timeout=300)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    return result.get("response", "")
+                else:
+                    # 如果 generate 失敗，嘗試 chat endpoint
+                    chat_url = f"{self.base_url}/api/chat"
+                    chat_payload = {
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "stream": False,
+                        "options": {"temperature": self.temperature}
+                    }
                     
+                    chat_response = requests.post(chat_url, json=chat_payload, timeout=300)
+                    if chat_response.status_code == 200:
+                        chat_result = chat_response.json()
+                        return chat_result.get("message", {}).get("content", "")
+                    else:
+                        return f"Ollama API 錯誤: {response.status_code} - {response.text[:200]}"
+                        
         except requests.exceptions.ConnectionError as e:
-            return f"無法連接到 Ollama 服務 ({self.base_url})，請確保 Ollama 正在運行。錯誤: {str(e)}"
+            if stream:
+                yield f"無法連接到 Ollama 服務 ({self.base_url})，請確保 Ollama 正在運行。錯誤: {str(e)}"
+            else:
+                return f"無法連接到 Ollama 服務 ({self.base_url})，請確保 Ollama 正在運行。錯誤: {str(e)}"
         except requests.exceptions.Timeout:
-            return "Ollama 請求超時，可能是模型載入時間過長，請稍後再試"
+            if stream:
+                yield "Ollama 請求超時，可能是模型載入時間過長，請稍後再試"
+            else:
+                return "Ollama 請求超時，可能是模型載入時間過長，請稍後再試"
         except Exception as e:
-            return f"Ollama 錯誤: {type(e).__name__}: {str(e)}"
+            if stream:
+                yield f"Ollama 錯誤: {type(e).__name__}: {str(e)}"
+            else:
+                return f"Ollama 錯誤: {type(e).__name__}: {str(e)}"
     
     def __call__(self, prompt):
         """支援函數調用方式"""

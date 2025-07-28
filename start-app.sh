@@ -69,8 +69,8 @@ start_service() {
     echo -e "${BLUE}啟動 $name...${NC}"
     
     # 啟動服務
-    if [ "$name" == "streamlit" ]; then
-        # Streamlit 特殊處理
+    if [ "$name" == "api_server" ]; then
+        # FastAPI 特殊處理
         nohup $command > "$log_file" 2>&1 &
     else
         # 其他服務
@@ -128,7 +128,7 @@ done
 
 # 3. 檢查端口
 echo -e "\n${BLUE}3. 檢查端口可用性${NC}"
-check_port 8501 "Streamlit"
+check_port 7777 "FastAPI"
 check_port 11434 "Ollama"
 
 # 4. 啟動 Ollama（如果配置使用）
@@ -197,7 +197,7 @@ fi
 echo -e "\n${BLUE}7. 檢查 Python 依賴${NC}"
 if [ -f "$PROJECT_ROOT/requirements.txt" ]; then
     # 檢查關鍵套件
-    if ! python3 -c "import streamlit" 2>/dev/null; then
+    if ! python3 -c "import fastapi" 2>/dev/null; then
         echo -e "${YELLOW}安裝 Python 依賴...${NC}"
         pip3 install -r "$PROJECT_ROOT/requirements.txt"
     else
@@ -205,10 +205,10 @@ if [ -f "$PROJECT_ROOT/requirements.txt" ]; then
     fi
 fi
 
-# 8. 啟動 Streamlit 應用
-echo -e "\n${BLUE}8. 啟動 Streamlit 應用${NC}"
+# 8. 啟動 API 服務
+echo -e "\n${BLUE}8. 啟動 FastAPI 應用${NC}"
 cd "$PROJECT_ROOT"
-start_service "streamlit" "streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true"
+start_service "api_server" "python3 api_server.py"
 
 # 9. 顯示狀態
 echo -e "\n${GREEN}================================${NC}"
@@ -216,7 +216,8 @@ echo -e "${GREEN}✅ RAG System 啟動完成！${NC}"
 echo -e "${GREEN}================================${NC}"
 echo
 echo -e "📊 服務狀態："
-echo -e "  ${BLUE}Streamlit${NC}: http://localhost:8501"
+echo -e "  ${BLUE}Web UI${NC}: http://localhost:7777"
+echo -e "  ${BLUE}API Docs${NC}: http://localhost:7777/docs"
 
 if [ "$LLM_PROVIDER" == "ollama" ]; then
     echo -e "  ${BLUE}Ollama API${NC}: http://localhost:11434"
@@ -228,7 +229,7 @@ fi
 
 echo
 echo -e "📁 日誌位置："
-echo -e "  Streamlit: $LOG_DIR/streamlit.log"
+echo -e "  API Server: $LOG_DIR/api_server.log"
 if [ -f "$PID_DIR/ollama.pid" ]; then
     echo -e "  Ollama: $LOG_DIR/ollama.log"
 fi
@@ -237,16 +238,16 @@ echo
 echo -e "💡 提示："
 echo -e "  - 查看日誌: tail -f $LOG_DIR/*.log"
 echo -e "  - 停止服務: ./stop-app.sh"
-echo -e "  - 查看狀態: ps aux | grep -E 'streamlit|ollama'"
+echo -e "  - 查看狀態: ps aux | grep -E 'api_server|ollama'"
 
 # 10. 健康檢查（可選）
 echo -e "\n${BLUE}執行健康檢查...${NC}"
 sleep 3
 
-if curl -s http://localhost:8501 >/dev/null 2>&1; then
-    echo -e "${GREEN}✓ Streamlit 回應正常${NC}"
+if curl -s http://localhost:7777 >/dev/null 2>&1; then
+    echo -e "${GREEN}✓ API Server 回應正常${NC}"
 else
-    echo -e "${RED}✗ Streamlit 無回應，請查看日誌${NC}"
+    echo -e "${RED}✗ API Server 無回應，請查看日誌${NC}"
 fi
 
 echo -e "\n${GREEN}🎉 系統已就緒！${NC}"
