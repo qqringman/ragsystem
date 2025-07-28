@@ -23,6 +23,23 @@ log_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# 檢查 Docker 是否安裝
+check_docker() {
+    if ! command -v docker &> /dev/null; then
+        log_error "Docker 未安裝"
+        exit 1
+    fi
+    
+    if ! docker info &> /dev/null; then
+        log_error "Docker 服務未運行"
+        exit 1
+    fi
+}
+
 # 顯示選項
 show_options() {
     echo "======================================"
@@ -40,26 +57,44 @@ show_options() {
 # 停止服務
 stop_services() {
     log_info "停止所有服務..."
-    docker-compose stop
+    
+    # 檢查 docker-compose 命令
+    if command -v docker-compose &> /dev/null; then
+        docker-compose stop
+    else
+        docker compose stop
+    fi
+    
     log_success "服務已停止"
 }
 
 # 移除容器
 remove_containers() {
     log_info "停止並移除容器..."
-    docker-compose down
+    
+    if command -v docker-compose &> /dev/null; then
+        docker-compose down
+    else
+        docker compose down
+    fi
+    
     log_success "容器已移除（資料卷保留）"
 }
 
 # 完全清理
 clean_all() {
     log_warning "即將移除所有容器和資料！"
-    echo -n "確定要繼續嗎？(yes/no): "
+    echo -n "請輸入 'yes' 確認: "
     read confirm
     
     if [ "$confirm" = "yes" ]; then
         log_info "移除所有容器和資料卷..."
-        docker-compose down -v
+        
+        if command -v docker-compose &> /dev/null; then
+            docker-compose down -v
+        else
+            docker compose down -v
+        fi
         
         # 清理本地資料目錄
         if [ -d "vector_db" ]; then
@@ -80,6 +115,9 @@ clean_all() {
 
 # 主流程
 main() {
+    # 檢查 Docker
+    check_docker
+    
     show_options
     
     echo -n "請輸入選項 (1-4): "
@@ -106,7 +144,11 @@ main() {
     
     echo ""
     log_info "目前 Docker 容器狀態："
-    docker-compose ps
+    if command -v docker-compose &> /dev/null; then
+        docker-compose ps
+    else
+        docker compose ps
+    fi
 }
 
 # 執行主流程

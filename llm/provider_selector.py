@@ -1,3 +1,4 @@
+# llm/provider_selector.py
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from config import get_config
@@ -18,76 +19,63 @@ class SimpleOllama:
         print(f"🤖 初始化 Ollama: {model} @ {self.base_url}")
     
     def predict(self, prompt, stream=False):
-        """直接調用 Ollama HTTP API"""
+        """直接調用 Ollama HTTP API - 確保總是返回字串"""
         try:
+            # 強制 stream 為 False 以避免返回 generator
+            stream = False
+            
             # 嘗試 generate endpoint
             url = f"{self.base_url}/api/generate"
             payload = {
                 "model": self.model,
                 "prompt": prompt,
-                "stream": stream,
+                "stream": False,  # 強制非流式
                 "options": {
                     "temperature": self.temperature,
-                    "num_predict": 2048,  # 增加最大輸出長度
-                    "stop": ["<|im_end|>", "</s>"]  # 停止標記
+                    "num_predict": 2048,
+                    "stop": ["<|im_end|>", "</s>"]
                 }
             }
             
-            if stream:
-                # 流式響應
-                response = requests.post(url, json=payload, stream=True, timeout=300)
-                if response.status_code == 200:
-                    for line in response.iter_lines():
-                        if line:
-                            try:
-                                data = json.loads(line)
-                                if 'response' in data:
-                                    yield data['response']
-                                if data.get('done', False):
-                                    break
-                            except json.JSONDecodeError:
-                                continue
-                else:
-                    yield f"Ollama API 錯誤: {response.status_code}"
+            response = requests.post(url, json=payload, timeout=300)
+            
+            if response.status_code == 200:
+                result = response.json()
+                # 確保返回字串
+                return str(result.get("response", ""))
             else:
-                # 非流式響應
-                response = requests.post(url, json=payload, timeout=300)
+                # 如果 generate 失敗，嘗試 chat endpoint
+                chat_url = f"{self.base_url}/api/chat"
+                chat_payload = {
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                    "options": {"temperature": self.temperature}
+                }
                 
-                if response.status_code == 200:
-                    result = response.json()
-                    return result.get("response", "")
+                chat_response = requests.post(chat_url, json=chat_payload, timeout=300)
+                if chat_response.status_code == 200:
+                    chat_result = chat_response.json()
+                    # 確保返回字串
+                    message_content = chat_result.get("message", {}).get("content", "")
+                    return str(message_content)
                 else:
-                    # 如果 generate 失敗，嘗試 chat endpoint
-                    chat_url = f"{self.base_url}/api/chat"
-                    chat_payload = {
-                        "model": self.model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "stream": False,
-                        "options": {"temperature": self.temperature}
-                    }
+                    error_msg = f"Ollama API 錯誤: {response.status_code} - {response.text[:200]}"
+                    print(f"❌ {error_msg}")
+                    return error_msg
                     
-                    chat_response = requests.post(chat_url, json=chat_payload, timeout=300)
-                    if chat_response.status_code == 200:
-                        chat_result = chat_response.json()
-                        return chat_result.get("message", {}).get("content", "")
-                    else:
-                        return f"Ollama API 錯誤: {response.status_code} - {response.text[:200]}"
-                        
         except requests.exceptions.ConnectionError as e:
-            if stream:
-                yield f"無法連接到 Ollama 服務 ({self.base_url})，請確保 Ollama 正在運行。錯誤: {str(e)}"
-            else:
-                return f"無法連接到 Ollama 服務 ({self.base_url})，請確保 Ollama 正在運行。錯誤: {str(e)}"
+            error_msg = f"無法連接到 Ollama 服務 ({self.base_url})，請確保 Ollama 正在運行。錯誤: {str(e)}"
+            print(f"❌ {error_msg}")
+            return error_msg
         except requests.exceptions.Timeout:
-            if stream:
-                yield "Ollama 請求超時，可能是模型載入時間過長，請稍後再試"
-            else:
-                return "Ollama 請求超時，可能是模型載入時間過長，請稍後再試"
+            error_msg = "Ollama 請求超時，可能是模型載入時間過長，請稍後再試"
+            print(f"❌ {error_msg}")
+            return error_msg
         except Exception as e:
-            if stream:
-                yield f"Ollama 錯誤: {type(e).__name__}: {str(e)}"
-            else:
-                return f"Ollama 錯誤: {type(e).__name__}: {str(e)}"
+            error_msg = f"Ollama 錯誤: {type(e).__name__}: {str(e)}"
+            print(f"❌ {error_msg}")
+            return error_msg
     
     def __call__(self, prompt):
         """支援函數調用方式"""
@@ -95,6 +83,19 @@ class SimpleOllama:
     
     def invoke(self, prompt):
         """兼容 LangChain 的 invoke 方法"""
+        # 如果 prompt 是 BaseMessage 或其他 LangChain 物件
+        if hasattr(prompt, 'content'):
+            prompt = prompt.content
+        elif hasattr(prompt, 'messages'):
+            # 如果是訊息列表
+            messages = prompt.messages
+            if messages:
+                prompt = messages[-1].content if hasattr(messages[-1], 'content') else str(messages[-1])
+            else:
+                prompt = str(prompt)
+        else:
+            prompt = str(prompt)
+        
         return self.predict(prompt)
     
     @property

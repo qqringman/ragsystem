@@ -184,8 +184,28 @@ class RAGChain:
             else:
                 prompt = self._build_general_prompt(query, context)
             
-            # 生成答案
-            answer = self.llm.predict(prompt)
+                # 生成答案
+                try:
+                    raw_answer = self.llm.predict(prompt)
+                    
+                    # 確保答案是字串
+                    if isinstance(raw_answer, str):
+                        answer = raw_answer
+                    elif hasattr(raw_answer, '__iter__') and not isinstance(raw_answer, str):
+                        # 如果是 generator 或其他可迭代物件
+                        answer = ''.join(str(chunk) for chunk in raw_answer)
+                    else:
+                        # 其他情況，轉換為字串
+                        answer = str(raw_answer)
+                    
+                    # 準備相關文檔的元數據
+                    highlighted = self._prepare_highlights(rel_docs, is_log_analysis)
+                    
+                    return [("docs", answer, highlighted)]
+                    
+                except Exception as e:
+                    print(f"❌ LLM 生成答案錯誤：{str(e)}")
+                    return [("docs", f"生成答案時發生錯誤：{str(e)}", None)]
             
             # 準備相關文檔的元數據
             highlighted = self._prepare_highlights(rel_docs, is_log_analysis)

@@ -1,3 +1,4 @@
+# db/sql_executor.py
 import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Dict, Any
@@ -56,8 +57,31 @@ def nl_to_sql(nl_query: str) -> str:
     # 建構提示
     prompt = f"{system_prompt}\n\n問題：{nl_query}\n\nSQL："
     
-    # 獲取 SQL
-    sql = llm.predict(prompt).strip()
+    # 獲取 SQL - 修復這裡
+    try:
+        # 確保 predict 方法不使用 stream 模式
+        if hasattr(llm, 'predict'):
+            # 對於 SimpleOllama，確保 stream=False
+            if hasattr(llm, '_llm_type') and llm._llm_type == "ollama":
+                result = llm.predict(prompt, stream=False)
+            else:
+                result = llm.predict(prompt)
+        else:
+            # 對於標準 LangChain LLM
+            result = llm.invoke(prompt)
+            if hasattr(result, 'content'):
+                result = result.content
+                
+        # 確保結果是字串
+        if isinstance(result, str):
+            sql = result.strip()
+        else:
+            # 如果不是字串，嘗試轉換
+            sql = str(result).strip()
+            
+    except Exception as e:
+        logger.error(f"LLM 預測失敗: {str(e)}")
+        raise ValueError(f"無法生成 SQL: {str(e)}")
     
     # 清理 SQL（移除可能的 markdown 標記）
     sql = sql.replace("```sql", "").replace("```", "").strip()

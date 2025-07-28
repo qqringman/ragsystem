@@ -96,63 +96,182 @@ async def chat(request: ChatRequest):
         # 構建對話上下文
         enhanced_query = request.query
         if request.context_messages:
-            context = "\n".join([
-                f"{msg.role}: {msg.content}" 
-                for msg in request.context_messages[-10:]  # 最多10輪
-            ])
-            enhanced_query = f"根據以下對話歷史：\n{context}\n\n當前問題：{request.query}"
+            # 過濾有效的訊息
+            valid_messages = []
+            for msg in request.context_messages[-10:]:  # 最多10輪
+                if hasattr(msg, 'role') and hasattr(msg, 'content'):
+                    valid_messages.append(f"{msg.role}: {msg.content}")
+                elif isinstance(msg, dict) and 'role' in msg and 'content' in msg:
+                    valid_messages.append(f"{msg['role']}: {msg['content']}")
+            
+            if valid_messages:
+                context = "\n".join(valid_messages)
+                enhanced_query = f"根據以下對話歷史：\n{context}\n\n當前問題：{request.query}"
+        
+        # 記錄請求信息
+        print(f"📨 收到查詢請求:")
+        print(f"   Session ID: {session_id}")
+        print(f"   Query: {request.query}")
+        print(f"   Sources: {request.sources}")
         
         # 執行 RAG 查詢
-        results = run_rag(
-            enhanced_query,
-            sources=request.sources,
-            files=None
-        )
-        print("11111")
-        print(results)
+        try:
+            results = run_rag(
+                enhanced_query,
+                sources=request.sources,
+                files=None
+            )
+        except Exception as rag_error:
+            print(f"❌ RAG 執行錯誤: {str(rag_error)}")
+            import traceback
+            traceback.print_exc()
+            
+            # 返回友好的錯誤訊息
+            return ChatResponse(
+                answer=f"抱歉，處理您的請求時發生錯誤：{str(rag_error)}",
+                sources=[],
+                session_id=session_id
+            )
+        
+        # 檢查結果類型
+        if not results:
+            print("⚠️ RAG 返回空結果")
+            return ChatResponse(
+                answer="抱歉，沒有找到相關資訊。",
+                sources=[],
+                session_id=session_id
+            )
+        
+        if not isinstance(results, list):
+            print(f"❌ RAG 返回了非預期的結果類型: {type(results)}")
+            results = []  # 設為空列表以避免後續錯誤
+        
         # 整合結果
         combined_answer = ""
         used_sources = []
+        error_messages = []
         
-        if results and isinstance(results, list):
-            for result in results:
+        for result in results:
+            try:
+                # 檢查結果格式
                 if isinstance(result, tuple) and len(result) >= 2:
-                    source_type = result[0]
-                    answer = result[1]
+                    source_type = str(result[0])
                     
-                    if answer and not answer.startswith("沒有找到") and not answer.startswith("無法"):
+                    # 確保 answer 是字串
+                    raw_answer = result[1]
+                    if isinstance(raw_answer, str):
+                        answer = raw_answer
+                    elif hasattr(raw_answer, '__iter__') and not isinstance(raw_answer, str):
+                        # 如果是 generator 或其他可迭代物件
+                        answer = ''.join(str(chunk) for chunk in raw_answer)
+                    else:
+                        answer = str(raw_answer)
+                    
+                    # 檢查是否為錯誤訊息
+                    if answer and not answer.startswith("沒有找到") and not answer.startswith("無法") and not answer.startswith("查詢失敗"):
                         if combined_answer:
                             combined_answer += "\n\n"
                         combined_answer += answer
                         used_sources.append(source_type)
+                    else:
+                        # 收集錯誤訊息
+                        error_messages.append(f"{source_type}: {answer}")
+                        print(f"⚠️ {source_type} 查詢失敗: {answer}")
+                else:
+                    print(f"⚠️ 無效的結果格式: {result}")
+            except Exception as result_error:
+                print(f"❌ 處理結果時發生錯誤: {str(result_error)}")
+                continue
         
-        if not combined_answer:
+        # 如果沒有成功的結果，但有錯誤訊息
+        if not combined_answer and error_messages:
+            combined_answer = "查詢過程中遇到以下問題：\n" + "\n".join(error_messages)
+        elif not combined_answer:
             combined_answer = "抱歉，在選定的資料來源中沒有找到相關資訊。"
         
         # 保存到 Redis（如果可用）
         if redis_client:
             try:
                 session_key = f"rag_session:{session_id}"
+                
+                # 準備要保存的訊息
+                messages_to_save = []
+                if request.context_messages:
+                    for msg in request.context_messages:
+                        if hasattr(msg, 'dict'):
+                            messages_to_save.append(msg.dict())
+                        elif isinstance(msg, dict):
+                            messages_to_save.append(msg)
+                        else:
+                            # 嘗試轉換為字典
+                            try:
+                                messages_to_save.append({
+                                    'role': getattr(msg, 'role', 'unknown'),
+                                    'content': getattr(msg, 'content', str(msg))
+                                })
+                            except:
+                                pass
+                
+                # 添加當前的問答
+                messages_to_save.append({
+                    'role': 'user',
+                    'content': request.query,
+                    'timestamp': datetime.now().isoformat()
+                })
+                messages_to_save.append({
+                    'role': 'assistant',
+                    'content': combined_answer,
+                    'sources': list(set(used_sources)),
+                    'timestamp': datetime.now().isoformat()
+                })
+                
                 session_data = {
-                    "messages": [msg.dict() for msg in request.context_messages] if request.context_messages else [],
+                    "messages": messages_to_save,
                     "last_update": datetime.now().isoformat()
                 }
+                
                 redis_client.setex(
                     session_key,
                     86400,  # 24小時過期
                     json.dumps(session_data, ensure_ascii=False)
                 )
-            except:
+                print(f"✅ 已保存對話到 Redis: {session_key}")
+            except Exception as redis_error:
+                print(f"⚠️ 保存到 Redis 失敗: {str(redis_error)}")
+                # Redis 錯誤不應該影響主要功能
                 pass
         
-        return ChatResponse(
+        # 返回結果
+        response = ChatResponse(
             answer=combined_answer,
             sources=list(set(used_sources)),
             session_id=session_id
         )
         
+        print(f"✅ 成功返回回應:")
+        print(f"   Sources: {response.sources}")
+        print(f"   Answer length: {len(response.answer)} chars")
+        
+        return response
+        
+    except ValueError as ve:
+        # 處理值錯誤（如配置問題）
+        print(f"❌ 值錯誤: {str(ve)}")
+        raise HTTPException(
+            status_code=400, 
+            detail=f"請求參數錯誤：{str(ve)}"
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # 處理其他未預期的錯誤
+        print(f"❌ 未預期的錯誤: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # 返回通用錯誤訊息給用戶
+        raise HTTPException(
+            status_code=500, 
+            detail=f"服務器內部錯誤：{str(e)}"
+        )
 
 @app.post("/api/chat/upload")
 async def chat_with_files(

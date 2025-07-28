@@ -30,6 +30,16 @@ STATE_FILE="$PROJECT_ROOT/.rag-system-state"
 # 創建必要目錄
 mkdir -p "$PID_DIR" "$LOG_DIR"
 
+# 檢查作業系統
+OS_TYPE="$(uname -s)"
+case "$OS_TYPE" in
+    Linux*)     MACHINE=Linux;;
+    Darwin*)    MACHINE=Mac;;
+    CYGWIN*)    MACHINE=Cygwin;;
+    MINGW*)     MACHINE=MinGw;;
+    *)          MACHINE="UNKNOWN:${OS_TYPE}"
+esac
+
 # 清除螢幕並顯示標題
 show_header() {
     clear
@@ -139,17 +149,27 @@ check_docker_service() {
     fi
 }
 
-# 檢查端口
+# 檢查端口（修正版）
 check_port() {
     local port=$1
     local name=$2
     
-    if lsof -i:$port >/dev/null 2>&1; then
-        local pid=$(lsof -t -i:$port | head -1)
-        local process=$(ps -p $pid -o comm= 2>/dev/null || echo "unknown")
-        echo -e "  ${YELLOW}●${NC} $port ($name) - $process"
+    # 使用不同方式檢查端口，根據作業系統
+    if [ "$MACHINE" = "Mac" ]; then
+        if lsof -i:$port >/dev/null 2>&1; then
+            local pid=$(lsof -t -i:$port | head -1)
+            local process=$(ps -p $pid -o comm= 2>/dev/null || echo "unknown")
+            echo -e "  ${YELLOW}●${NC} $port ($name) - $process"
+        else
+            echo -e "  ${GREEN}○${NC} $port ($name) - 可用"
+        fi
     else
-        echo -e "  ${GREEN}○${NC} $port ($name) - 可用"
+        # Linux
+        if netstat -tuln 2>/dev/null | grep -q ":$port "; then
+            echo -e "  ${YELLOW}●${NC} $port ($name) - 使用中"
+        else
+            echo -e "  ${GREEN}○${NC} $port ($name) - 可用"
+        fi
     fi
 }
 

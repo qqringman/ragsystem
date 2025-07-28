@@ -16,9 +16,19 @@ PROJECT_ROOT="$SCRIPT_DIR"
 PID_DIR="$PROJECT_ROOT/.pids"
 LOG_DIR="$PROJECT_ROOT/logs"
 
+# 檢查作業系統
+OS_TYPE="$(uname -s)"
+case "$OS_TYPE" in
+    Linux*)     MACHINE=Linux;;
+    Darwin*)    MACHINE=Mac;;
+    CYGWIN*)    MACHINE=Cygwin;;
+    MINGW*)     MACHINE=MinGw;;
+    *)          MACHINE="UNKNOWN:${OS_TYPE}"
+esac
+
 # 載入環境變數
 if [ -f "$PROJECT_ROOT/.env" ]; then
-    export $(cat "$PROJECT_ROOT/.env" | grep -v '^#' | xargs)
+    export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
 fi
 
 # 函數：停止服務
@@ -72,7 +82,14 @@ stop_by_name() {
     local process_name=$1
     local service_name=$2
     
-    local pids=$(pgrep -f "$process_name")
+    # 使用跨平台的方式查找進程
+    local pids=""
+    if [ "$MACHINE" = "Mac" ]; then
+        pids=$(pgrep -f "$process_name" 2>/dev/null || ps aux | grep "$process_name" | grep -v grep | awk '{print $2}')
+    else
+        pids=$(pgrep -f "$process_name" 2>/dev/null)
+    fi
+    
     if [ -n "$pids" ]; then
         echo -e "${BLUE}發現 $service_name 進程，停止中...${NC}"
         for pid in $pids; do
@@ -81,7 +98,12 @@ stop_by_name() {
         sleep 2
         
         # 檢查是否還有進程
-        local remaining=$(pgrep -f "$process_name")
+        if [ "$MACHINE" = "Mac" ]; then
+            remaining=$(pgrep -f "$process_name" 2>/dev/null || ps aux | grep "$process_name" | grep -v grep | awk '{print $2}')
+        else
+            remaining=$(pgrep -f "$process_name" 2>/dev/null)
+        fi
+        
         if [ -n "$remaining" ]; then
             echo -e "${YELLOW}強制停止剩餘的 $service_name 進程...${NC}"
             for pid in $remaining; do
@@ -89,6 +111,37 @@ stop_by_name() {
             done
         fi
         echo -e "${GREEN}✓ $service_name 進程已清理${NC}"
+    fi
+}
+
+# 函數：檢查並清理端口
+cleanup_port() {
+    local port=$1
+    local service_name=$2
+    
+    # 檢查是否有 lsof 命令
+    if command -v lsof &> /dev/null; then
+        local pid=$(lsof -t -i:$port 2>/dev/null | head -1)
+        if [ -n "$pid" ]; then
+            echo -e "${YELLOW}清理占用端口 $port 的進程 (PID: $pid)${NC}"
+            kill -TERM $pid 2>/dev/null
+            sleep 1
+            # 如果還在運行，強制終止
+            if lsof -t -i:$port >/dev/null 2>&1; then
+                kill -KILL $pid 2>/dev/null || true
+            fi
+        fi
+    elif command -v netstat &> /dev/null; then
+        # 使用 netstat 作為備選方案（主要用於 Linux）
+        if [ "$MACHINE" = "Linux" ]; then
+            local pid=$(netstat -tulnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1)
+            if [ -n "$pid" ]; then
+                echo -e "${YELLOW}清理占用端口 $port 的進程 (PID: $pid)${NC}"
+                kill -TERM $pid 2>/dev/null
+                sleep 1
+                kill -KILL $pid 2>/dev/null || true
+            fi
+        fi
     fi
 }
 
@@ -107,7 +160,7 @@ if [ "$LLM_PROVIDER" == "ollama" ] || [ -f "$PID_DIR/ollama.pid" ]; then
     stop_service "ollama"
     
     # 嘗試使用 systemctl（如果是系統服務）
-    if systemctl is-active --quiet ollama 2>/dev/null; then
+    if command -v systemctl &> /dev/null && systemctl is-active --quiet ollama 2>/dev/null; then
         echo "停止 Ollama systemd 服務..."
         sudo systemctl stop ollama
     fi
@@ -120,6 +173,11 @@ fi
 if [ "$VECTOR_DB" == "redis" ] || [ -f "$PID_DIR/redis.pid" ]; then
     echo -e "\n${BLUE}3. 停止 Redis${NC}"
     stop_service "redis"
+    
+    # 也嘗試停止系統 Redis
+    if command -v redis-cli &> /dev/null; then
+        redis-cli shutdown 2>/dev/null || true
+    fi
 fi
 
 # 4. 清理殘留進程
@@ -127,19 +185,13 @@ echo -e "\n${BLUE}4. 清理殘留進程${NC}"
 
 # 檢查特定端口
 for port in 7777 11434; do
-    local pid=$(lsof -t -i:$port 2>/dev/null)
-    if [ -n "$pid" ]; then
-        echo -e "${YELLOW}清理占用端口 $port 的進程 (PID: $pid)${NC}"
-        kill -TERM $pid 2>/dev/null
-        sleep 1
-        kill -KILL $pid 2>/dev/null || true
-    fi
+    cleanup_port $port "Port $port"
 done
 
 # 5. 清理 PID 檔案
 echo -e "\n${BLUE}5. 清理 PID 檔案${NC}"
 if [ -d "$PID_DIR" ]; then
-    local pid_count=$(ls -1 "$PID_DIR"/*.pid 2>/dev/null | wc -l)
+    local pid_count=$(find "$PID_DIR" -name "*.pid" 2>/dev/null | wc -l)
     if [ $pid_count -gt 0 ]; then
         echo "清理 $pid_count 個 PID 檔案..."
         rm -f "$PID_DIR"/*.pid
@@ -154,10 +206,19 @@ PROCESSES=("api_server" "ollama" "redis-server")
 FOUND_PROCESSES=false
 
 for proc in "${PROCESSES[@]}"; do
-    if pgrep -f "$proc" >/dev/null 2>&1; then
-        echo -e "${YELLOW}⚠ 發現 $proc 進程仍在運行${NC}"
-        pgrep -f "$proc" -a
-        FOUND_PROCESSES=true
+    # 跨平台進程檢查
+    if [ "$MACHINE" = "Mac" ]; then
+        if pgrep -f "$proc" >/dev/null 2>&1 || ps aux | grep "$proc" | grep -v grep >/dev/null 2>&1; then
+            echo -e "${YELLOW}⚠ 發現 $proc 進程仍在運行${NC}"
+            ps aux | grep "$proc" | grep -v grep
+            FOUND_PROCESSES=true
+        fi
+    else
+        if pgrep -f "$proc" >/dev/null 2>&1; then
+            echo -e "${YELLOW}⚠ 發現 $proc 進程仍在運行${NC}"
+            pgrep -f "$proc" -a
+            FOUND_PROCESSES=true
+        fi
     fi
 done
 
@@ -168,7 +229,20 @@ fi
 # 檢查端口
 echo -e "\n檢查端口狀態："
 for port in 7777 11434 6379; do
-    if lsof -i:$port >/dev/null 2>&1; then
+    port_in_use=false
+    
+    # 跨平台端口檢查
+    if command -v lsof &> /dev/null; then
+        if lsof -i:$port >/dev/null 2>&1; then
+            port_in_use=true
+        fi
+    elif command -v netstat &> /dev/null; then
+        if netstat -tuln 2>/dev/null | grep -q ":$port "; then
+            port_in_use=true
+        fi
+    fi
+    
+    if [ "$port_in_use" = true ]; then
         echo -e "${YELLOW}⚠ 端口 $port 仍被占用${NC}"
     else
         echo -e "${GREEN}✓ 端口 $port 已釋放${NC}"
@@ -194,3 +268,8 @@ fi
 echo -e "\n${BLUE}提示：${NC}"
 echo "  - 重新啟動: ./start-app.sh"
 echo "  - 查看是否有殘留進程: ps aux | grep -E 'api_server|ollama|redis'"
+
+# 刪除狀態檔案
+if [ -f "$STATE_FILE" ]; then
+    rm -f "$STATE_FILE"
+fi
