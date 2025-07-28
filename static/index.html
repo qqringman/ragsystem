@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG 智能助手</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 側邊欄 -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>🧠 知識庫管理</h2>
+                <button class="sidebar-toggle" onclick="toggleSidebar()">×</button>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="tabs">
+                    <button class="tab-button active" onclick="showTab('files')">📚 文件管理</button>
+                    <button class="tab-button" onclick="showTab('sources')">🔌 資料來源</button>
+                    <button class="tab-button" onclick="showTab('settings')">⚙️ 設定</button>
+                </div>
+                
+                <!-- 文件管理標籤 -->
+                <div class="tab-content" id="files-tab">
+                    <h3>已索引的檔案</h3>
+                    <div id="indexed-files-list" class="file-list">
+                        <!-- 動態載入 -->
+                    </div>
+                    
+                    <div class="divider"></div>
+                    
+                    <h3>新增到知識庫</h3>
+                    <div class="upload-area" id="kb-upload-area">
+                        <input type="file" id="kb-file-input" multiple accept=".pdf,.docx,.doc,.txt,.md,.html,.htm,.xlsx,.xls,.json,.log,.csv" style="display: none;">
+                        <p>📁 拖放檔案到這裡，或點擊選擇</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="addToKnowledgeBase()">📥 加入知識庫</button>
+                    
+                    <div class="divider"></div>
+                    
+                    <button class="btn btn-danger" onclick="clearKnowledgeBase()">🗑️ 清空知識庫</button>
+                </div>
+                
+                <!-- 資料來源標籤 -->
+                <div class="tab-content" id="sources-tab" style="display: none;">
+                    <h3>資料來源設定</h3>
+                    <div class="source-list">
+                        <div class="source-item">
+                            <div class="source-info">
+                                <strong>📄 文件庫</strong>
+                                <span class="source-desc">搜尋已索引的文件</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" checked disabled>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="source-item">
+                            <div class="source-info">
+                                <strong>🗄️ 資料庫</strong>
+                                <span class="source-desc">查詢資料庫</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" checked disabled>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="source-item disabled">
+                            <div class="source-info">
+                                <strong>🌐 網路搜尋</strong>
+                                <span class="source-desc">即將推出</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" disabled>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 設定標籤 -->
+                <div class="tab-content" id="settings-tab" style="display: none;">
+                    <h3>系統設定</h3>
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label>LLM 提供者</label>
+                            <select id="llm-provider">
+                                <option value="openai">OpenAI</option>
+                                <option value="claude">Claude</option>
+                                <option value="ollama">Ollama</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>搜尋結果數量</label>
+                            <input type="number" id="search-k" min="1" max="20" value="5">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="enable-memory" checked>
+                                啟用對話記憶
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- 主要內容區 -->
+        <main class="main-content">
+            <!-- 頂部導航 -->
+            <header class="top-nav">
+                <button class="menu-button" onclick="toggleSidebar()">☰</button>
+                <h1>💬 RAG 智能助手</h1>
+                <div class="nav-actions">
+                    <button class="nav-button" onclick="newChat()">🔄 新對話</button>
+                    <button class="nav-button" onclick="exportChat()">📥 匯出</button>
+                    <button class="nav-button" onclick="showHelp()">❓ 說明</button>
+                </div>
+            </header>
+            
+            <!-- 聊天區域 -->
+            <div class="chat-container" id="chat-container">
+                <!-- 歡迎訊息 -->
+                <div class="welcome-message" id="welcome-message">
+                    <h2>👋 歡迎使用 RAG 智能助手</h2>
+                    <p>我可以幫您搜尋文件、查詢資料庫，回答各種問題。</p>
+                    <div class="suggestions">
+                        <p><strong>您可以試著問我：</strong></p>
+                        <button class="suggestion-chip" onclick="sendSuggestion('幫我搜尋相關文件')">搜尋特定文件內容</button>
+                        <button class="suggestion-chip" onclick="sendSuggestion('分析這個檔案的內容')">分析上傳的檔案</button>
+                        <button class="suggestion-chip" onclick="sendSuggestion('查詢資料庫中的資訊')">查詢資料庫資訊</button>
+                        <button class="suggestion-chip" onclick="sendSuggestion('解釋一下這個技術概念')">解答技術問題</button>
+                    </div>
+                </div>
+                
+                <!-- 對話訊息將動態插入這裡 -->
+            </div>
+            
+            <!-- 輸入區域 -->
+            <div class="input-section">
+                <!-- 資料來源選擇 -->
+                <div class="source-selector">
+                    <span class="source-label">🔍 搜尋來源：</span>
+                    <label class="source-checkbox">
+                        <input type="checkbox" id="source-docs" checked>
+                        <span>📄 文件</span>
+                    </label>
+                    <label class="source-checkbox">
+                        <input type="checkbox" id="source-db" checked>
+                        <span>🗄️ 資料庫</span>
+                    </label>
+                    <label class="source-checkbox disabled">
+                        <input type="checkbox" disabled>
+                        <span>🌐 網路</span>
+                    </label>
+                    <label class="source-checkbox disabled">
+                        <input type="checkbox" disabled>
+                        <span>📋 Jira</span>
+                    </label>
+                </div>
+                
+                <!-- 檔案上傳 -->
+                <div class="file-upload-section">
+                    <details>
+                        <summary>📎 附加檔案（可選）</summary>
+                        <div class="temp-upload-area" id="temp-upload-area">
+                            <input type="file" id="temp-file-input" multiple accept=".pdf,.docx,.doc,.txt,.md,.html,.htm,.xlsx,.xls,.json,.log,.csv" style="display: none;">
+                            <p>拖放檔案到這裡，或點擊選擇</p>
+                        </div>
+                        <div id="temp-files-list" class="temp-files-list"></div>
+                    </details>
+                </div>
+                
+                <!-- 輸入框 -->
+                <div class="input-container">
+                    <textarea 
+                        id="message-input" 
+                        class="message-input" 
+                        placeholder="請輸入您想要詢問的問題...&#10;&#10;提示：您可以附加檔案進行分析，或從知識庫中搜尋相關資訊。"
+                        rows="4"
+                    ></textarea>
+                    <button class="send-button" onclick="sendMessage()">
+                        發送
+                    </button>
+                </div>
+                <div class="input-hint">按 Shift + Enter 換行，按 Enter 發送</div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- 載入提示 -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+    
+    <!-- 說明彈窗 -->
+    <div class="modal" id="help-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>使用說明</h2>
+                <button class="modal-close" onclick="closeHelp()">×</button>
+            </div>
+            <div class="modal-body">
+                <h3>🎯 功能特點</h3>
+                <ul>
+                    <li><strong>多資料來源</strong>：可同時從文件庫、資料庫等多個來源查詢</li>
+                    <li><strong>對話記憶</strong>：系統會記住對話上下文，支援連續對話</li>
+                    <li><strong>即時分析</strong>：可上傳檔案進行即時分析，無需加入知識庫</li>
+                    <li><strong>智能搜尋</strong>：自動選擇最相關的資訊來源回答問題</li>
+                </ul>
+                
+                <h3>💡 使用技巧</h3>
+                <ol>
+                    <li>選擇資料來源：勾選你想要搜尋的資料來源</li>
+                    <li>上傳檔案：可選擇性上傳檔案進行分析</li>
+                    <li>自然對話：像聊天一樣提問，系統會理解上下文</li>
+                    <li>知識庫管理：在側邊欄管理永久知識庫</li>
+                </ol>
+                
+                <h3>⌨️ 快捷鍵</h3>
+                <ul>
+                    <li><kbd>Enter</kbd>：發送訊息</li>
+                    <li><kbd>Shift + Enter</kbd>：換行</li>
+                    <li><kbd>Ctrl/Cmd + K</kbd>：新對話</li>
+                    <li><kbd>Ctrl/Cmd + S</kbd>：匯出對話</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/app.js"></script>
+</body>
+</html>
