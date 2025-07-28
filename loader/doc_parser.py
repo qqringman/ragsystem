@@ -8,12 +8,13 @@ from langchain_community.document_loaders import (
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from config import get_config
 
-# 導入 log 解析器（如果存在）
+# 導入 log 解析器管理器
 try:
-    from .log_parser import LogParser
-    log_parser = LogParser()
+    from .log_parser_manager import log_parser_manager
+    HAS_LOG_PARSER = True
 except ImportError:
-    log_parser = None
+    log_parser_manager = None
+    HAS_LOG_PARSER = False
     print("⚠️  Log 解析器未安裝，將使用標準文字處理")
 
 
@@ -42,16 +43,30 @@ def load_and_split_documents(file_paths):
         try:
             # 特殊處理 log 檔案
             if ext == ".log" or (ext == ".txt" and "log" in Path(path).stem.lower()):
-                if log_parser:
+                if HAS_LOG_PARSER and log_parser_manager:
                     print(f"📊 使用專門的 Log 解析器處理...")
-                    loaded_docs = log_parser.parse_log_file(path)
+                    loaded_docs = log_parser_manager.parse_log_file(path)
                     
                     # 如果是大型 log 檔案，顯示分析結果
                     if file_size_mb > 1:
                         print(f"   ✅ Log 檔案分析完成：{len(loaded_docs)} 個片段")
-                        if loaded_docs and 'error_count' in loaded_docs[0].metadata:
-                            total_errors = sum(doc.metadata.get('error_count', 0) for doc in loaded_docs)
-                            print(f"   🔍 發現 {total_errors} 個錯誤相關條目")
+                        
+                        # 顯示分析統計
+                        if loaded_docs:
+                            log_types = set(doc.metadata.get('log_type', 'unknown') for doc in loaded_docs)
+                            print(f"   📋 Log 類型: {', '.join(log_types)}")
+                            
+                            # 如果有錯誤統計
+                            error_docs = [doc for doc in loaded_docs if doc.metadata.get('error_count', 0) > 0]
+                            if error_docs:
+                                total_errors = sum(doc.metadata.get('error_count', 0) for doc in error_docs)
+                                print(f"   🔍 發現 {total_errors} 個錯誤相關條目")
+                            
+                            # 如果有崩潰資訊
+                            crash_docs = [doc for doc in loaded_docs if doc.metadata.get('crash_type')]
+                            if crash_docs:
+                                crash_types = set(doc.metadata.get('crash_type', 'unknown') for doc in crash_docs)
+                                print(f"   💥 崩潰類型: {', '.join(crash_types)}")
                 else:
                     # 降級到文字載入器
                     loader = TextLoader(path, encoding='utf-8')
@@ -134,5 +149,18 @@ def load_and_split_documents(file_paths):
         all_docs = already_split_docs
     
     print(f"📚 總共處理完成 {len(all_docs)} 個文檔片段")
+    
+    # 顯示處理統計
+    if all_docs:
+        # 統計不同類型的文檔
+        doc_types = {}
+        for doc in all_docs:
+            doc_type = doc.metadata.get('file_type', 'unknown')
+            doc_types[doc_type] = doc_types.get(doc_type, 0) + 1
+        
+        if len(doc_types) > 1 or 'log' in doc_types:
+            print(f"📊 文檔類型統計:")
+            for doc_type, count in doc_types.items():
+                print(f"   - {doc_type}: {count} 個片段")
     
     return all_docs
